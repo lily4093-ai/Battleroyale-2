@@ -1,5 +1,7 @@
 package com.battleroyale.supply;
 
+import com.battleroyale.BattleRoyalePlugin;
+import com.battleroyale.config.ConfigManager;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -13,14 +15,11 @@ import java.util.*;
 public class SupplyLootGenerator {
     
     private final Random random = new Random();
+    private final ConfigManager config;
     
-    // 총기 티어별 가중치
-    private static final int COMMON_WEIGHT = 50;
-    private static final int UNCOMMON_WEIGHT = 30;
-    private static final int RARE_WEIGHT = 15;
-    private static final int EPIC_WEIGHT = 4;
-    private static final int LEGENDARY_WEIGHT = 1;
-    private static final int TOTAL_GUN_WEIGHT = COMMON_WEIGHT + UNCOMMON_WEIGHT + RARE_WEIGHT + EPIC_WEIGHT + LEGENDARY_WEIGHT;
+    public SupplyLootGenerator(BattleRoyalePlugin plugin) {
+        this.config = plugin.getConfigManager();
+    }
     
     /**
      * 보급 상자에 루팅 생성
@@ -30,8 +29,8 @@ public class SupplyLootGenerator {
         
         String selectedGunAmmo = null;
         
-        // 1. 총기 (35% 확률)
-        if (random.nextDouble() < 0.35) {
+        // 1. 총기 (config에서 확률 읽기)
+        if (random.nextDouble() < config.getSupplyGunChance()) {
             GunData gun = selectRandomGun();
             if (gun != null) {
                 inventory.setItem(getRandomSlot(inventory), gun.itemStack);
@@ -39,10 +38,12 @@ public class SupplyLootGenerator {
             }
         }
         
-        // 2. 부착물 (슬롯당 8% 확률, 최대 2개)
+        // 2. 부착물 (config에서 확률 및 최대값 읽기)
         int attachmentCount = 0;
-        for (int i = 0; i < 27 && attachmentCount < 2; i++) {
-            if (random.nextDouble() < 0.08) {
+        int maxAttachments = config.getSupplyAttachmentMax();
+        double attachmentChance = config.getSupplyAttachmentChance();
+        for (int i = 0; i < 27 && attachmentCount < maxAttachments; i++) {
+            if (random.nextDouble() < attachmentChance) {
                 ItemStack attachment = getRandomAttachment();
                 if (attachment != null) {
                     inventory.setItem(getRandomSlot(inventory), attachment);
@@ -51,10 +52,12 @@ public class SupplyLootGenerator {
             }
         }
         
-        // 3. 음식 (슬롯당 15% 확률, 최대 3개)
+        // 3. 음식 (config에서 확률 및 최대값 읽기)
         int foodCount = 0;
-        for (int i = 0; i < 27 && foodCount < 3; i++) {
-            if (random.nextDouble() < 0.15) {
+        int maxFood = config.getSupplyFoodMax();
+        double foodChance = config.getSupplyFoodChance();
+        for (int i = 0; i < 27 && foodCount < maxFood; i++) {
+            if (random.nextDouble() < foodChance) {
                 ItemStack food = getRandomFood();
                 if (food != null) {
                     inventory.setItem(getRandomSlot(inventory), food);
@@ -63,10 +66,12 @@ public class SupplyLootGenerator {
             }
         }
         
-        // 4. 장비 (슬롯당 10% 확률, 최대 2개)
+        // 4. 장비 (config에서 확률 및 최대값 읽기)
         int equipmentCount = 0;
-        for (int i = 0; i < 27 && equipmentCount < 2; i++) {
-            if (random.nextDouble() < 0.10) {
+        int maxEquipment = config.getSupplyEquipmentMax();
+        double equipmentChance = config.getSupplyEquipmentChance();
+        for (int i = 0; i < 27 && equipmentCount < maxEquipment; i++) {
+            if (random.nextDouble() < equipmentChance) {
                 ItemStack equipment = getRandomEquipment();
                 if (equipment != null) {
                     inventory.setItem(getRandomSlot(inventory), equipment);
@@ -75,14 +80,16 @@ public class SupplyLootGenerator {
             }
         }
         
-        // 5. 조약돌 (25% 확률, 16개)
-        if (random.nextDouble() < 0.25) {
-            inventory.setItem(getRandomSlot(inventory), new ItemStack(Material.COBBLESTONE, 16));
+        // 5. 조약돌 (config에서 확률 및 개수 읽기)
+        if (random.nextDouble() < config.getSupplyCobblestoneChance()) {
+            int cobblestoneAmount = config.getSupplyCobblestoneAmount();
+            inventory.setItem(getRandomSlot(inventory), new ItemStack(Material.COBBLESTONE, cobblestoneAmount));
         }
         
-        // 6. 탄약 (빈 칸당 6% 확률)
+        // 6. 탄약 (config에서 확률 읽기)
+        double ammoChance = config.getSupplyAmmoChance();
         for (int i = 0; i < 27; i++) {
-            if (inventory.getItem(i) == null && random.nextDouble() < 0.06) {
+            if (inventory.getItem(i) == null && random.nextDouble() < ammoChance) {
                 ItemStack ammo = getRandomAmmo(selectedGunAmmo);
                 if (ammo != null) {
                     inventory.setItem(i, ammo);
@@ -113,15 +120,22 @@ public class SupplyLootGenerator {
      * 티어별 총기 선택
      */
     private GunData selectRandomGun() {
-        int roll = random.nextInt(TOTAL_GUN_WEIGHT);
+        int commonWeight = config.getGunTierCommon();
+        int uncommonWeight = config.getGunTierUncommon();
+        int rareWeight = config.getGunTierRare();
+        int epicWeight = config.getGunTierEpic();
+        int legendaryWeight = config.getGunTierLegendary();
+        int totalWeight = commonWeight + uncommonWeight + rareWeight + epicWeight + legendaryWeight;
         
-        if (roll < LEGENDARY_WEIGHT) {
+        int roll = random.nextInt(totalWeight);
+        
+        if (roll < legendaryWeight) {
             return getRandomLegendaryGun();
-        } else if (roll < LEGENDARY_WEIGHT + EPIC_WEIGHT) {
+        } else if (roll < legendaryWeight + epicWeight) {
             return getRandomEpicGun();
-        } else if (roll < LEGENDARY_WEIGHT + EPIC_WEIGHT + RARE_WEIGHT) {
+        } else if (roll < legendaryWeight + epicWeight + rareWeight) {
             return getRandomRareGun();
-        } else if (roll < LEGENDARY_WEIGHT + EPIC_WEIGHT + RARE_WEIGHT + UNCOMMON_WEIGHT) {
+        } else if (roll < legendaryWeight + epicWeight + rareWeight + uncommonWeight) {
             return getRandomUncommonGun();
         } else {
             return getRandomCommonGun();
@@ -211,22 +225,14 @@ public class SupplyLootGenerator {
      * TACZ 총기 아이템 생성
      */
     private ItemStack createTaczGun(String gunId, int ammo, String fireMode) {
-        // Note: Paper 플러그인에서는 NBT를 직접 다루기 어려우므로
-        // 실제로는 TACZ API를 사용하거나 NMS/Reflection을 사용해야 합니다
-        // 여기서는 기본 구조만 제공합니다
-        ItemStack gun = new ItemStack(Material.IRON_HOE); // TACZ 총기는 보통 커스텀 아이템
-        // TODO: TACZ API를 사용하여 실제 총기 데이터 설정
-        // gun.setItemMeta() 등으로 NBT 데이터 설정 필요
-        return gun;
+        return com.battleroyale.util.TaczItemUtil.createGun(gunId, ammo, fireMode);
     }
     
     /**
      * Heat가 있는 TACZ 총기 (미니건용)
      */
     private ItemStack createTaczGunWithHeat(String gunId, int ammo, String fireMode, float heat) {
-        ItemStack gun = createTaczGun(gunId, ammo, fireMode);
-        // TODO: HeatAmount NBT 추가
-        return gun;
+        return com.battleroyale.util.TaczItemUtil.createGun(gunId, ammo, fireMode, heat);
     }
     
     /**
@@ -244,9 +250,7 @@ public class SupplyLootGenerator {
         );
         
         String attachmentId = attachments.get(random.nextInt(attachments.size()));
-        ItemStack attachment = new ItemStack(Material.IRON_NUGGET);
-        // TODO: TACZ API로 부착물 데이터 설정
-        return attachment;
+        return com.battleroyale.util.TaczItemUtil.createAttachment(attachmentId);
     }
     
     /**
@@ -290,6 +294,19 @@ public class SupplyLootGenerator {
      * 랜덤 탄약
      */
     private ItemStack getRandomAmmo(String preferredAmmo) {
+        Map<String, String> ammoIdMap = new HashMap<>();
+        ammoIdMap.put("50ae", "tacz:ammo_50ae");
+        ammoIdMap.put("9mm", "tacz:ammo_9mm");
+        ammoIdMap.put("357mag", "tacz:ammo_357mag");
+        ammoIdMap.put("45acp", "tacz:ammo_45acp");
+        ammoIdMap.put("556x45", "tacz:ammo_556x45");
+        ammoIdMap.put("30_06", "tacz:ammo_30_06");
+        ammoIdMap.put("338", "tacz:ammo_338");
+        ammoIdMap.put("50bmg", "tacz:ammo_50bmg");
+        ammoIdMap.put("762x39", "tacz:ammo_762x39");
+        ammoIdMap.put("12g", "tacz:ammo_12g");
+        ammoIdMap.put("rpg_rocket", "tacz:ammo_rpg_rocket");
+        
         Map<String, Integer> ammoMaxCounts = new HashMap<>();
         ammoMaxCounts.put("50ae", 48);
         ammoMaxCounts.put("9mm", 60);
@@ -315,9 +332,8 @@ public class SupplyLootGenerator {
         boolean fullSet = random.nextBoolean(); // 50% 1세트, 50% 반세트
         int amount = fullSet ? maxCount : maxCount / 2;
         
-        ItemStack ammo = new ItemStack(Material.ARROW, amount); // TACZ 탄약은 커스텀 아이템
-        // TODO: TACZ API로 탄약 데이터 설정
-        return ammo;
+        String ammoId = ammoIdMap.get(ammoType);
+        return com.battleroyale.util.TaczItemUtil.createAmmo(ammoId, amount);
     }
     
     /**

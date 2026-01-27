@@ -32,7 +32,7 @@ public class SupplyDropManager {
     
     public SupplyDropManager(BattleRoyalePlugin plugin) {
         this.plugin = plugin;
-        this.lootGenerator = new SupplyLootGenerator();
+        this.lootGenerator = new SupplyLootGenerator(plugin);
         this.dropCount = 0;
     }
     
