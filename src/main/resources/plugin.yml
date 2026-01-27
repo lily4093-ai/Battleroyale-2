@@ -1,0 +1,22 @@
+name: BattleRoyale2
+version: '${project.version}'
+main: com.battleroyale.BattleRoyalePlugin
+api-version: '1.20'
+prefix: 배틀로얄 2.0
+authors: [BattleRoyale Team]
+description: Battle Royale plugin with TACZ integration
+
+commands:
+  br:
+    description: Battle Royale main command
+    usage: /br <start|stop|info> [team_size]
+    permission: battleroyale.admin
+    aliases: [battleroyale]
+
+permissions:
+  battleroyale.admin:
+    description: Allows access to admin commands
+    default: op
+  battleroyale.play:
+    description: Allows playing the game
+    default: true
