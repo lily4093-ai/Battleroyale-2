@@ -96,21 +96,21 @@ public class GameManager {
             playerDataMap.put(player.getUniqueId(), data);
         }
         
-        // 플레이어 스폰
-        spawnPlayers();
-        
         // 게임 시작
         gameState = GameState.ACTIVE;
         gameStartTime = System.currentTimeMillis();
+        
+        // 월드보더 먼저 설정 (스폰 위치 계산 전에 필요)
+        setupWorldBorder();
+        
+        // 플레이어 스폰 (월드보더 설정 후)
+        spawnPlayers();
         
         Bukkit.broadcastMessage("§a§l[배틀로얄 2.0] 게임이 시작되었습니다!");
         Bukkit.broadcastMessage("§e팀 크기: §f" + teamSize + "명");
         
         // 타이머 시작
         startGameTimers();
-        
-        // 월드보더 설정
-        setupWorldBorder();
         
         // 보급품 투하 스케줄
         scheduleSupplyDrops();
@@ -175,10 +175,26 @@ public class GameManager {
                 Player player = Bukkit.getPlayer(playerId);
                 if (player != null) {
                     player.teleport(spawnLoc);
-                    player.setHealth(60.0); // 30하트 (3줄)
+                    
+                    // 최대 체력 설정 후 현재 체력 설정
+                    double maxHealth = plugin.getConfigManager().getMaxHealth();
+                    player.setMaxHealth(maxHealth);
+                    player.setHealth(maxHealth);
+                    
                     player.setFoodLevel(20);
                     player.getInventory().clear();
                     player.setGameMode(GameMode.SURVIVAL);
+                    
+                    // 스폰 시 3초 무적 (낙하 데미지 방지)
+                    player.setInvulnerable(true);
+                    new BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            if (player.isOnline()) {
+                                player.setInvulnerable(false);
+                            }
+                        }
+                    }.runTaskLater(plugin, 60L); // 3초 (60틱)
                 }
             }
         }
@@ -195,7 +211,18 @@ public class GameManager {
         for (int attempts = 0; attempts < 100; attempts++) {
             double x = random.nextDouble() * size * 2 - size;
             double z = random.nextDouble() * size * 2 - size;
-            Location loc = world.getHighestBlockAt((int) x, (int) z).getLocation().add(0, 1, 0);
+            
+            // 안전한 Y 좌표 찾기 (너무 높지 않은 곳)
+            Location highestBlock = world.getHighestBlockAt((int) x, (int) z).getLocation();
+            
+            // 공중이나 나무 위가 아닌 실제 지면 찾기
+            int y = highestBlock.getBlockY();
+            while (y > 60 && (world.getBlockAt((int) x, y, (int) z).getType() == Material.AIR ||
+                   world.getBlockAt((int) x, y, (int) z).getType().name().contains("LEAVES"))) {
+                y--;
+            }
+            
+            Location loc = new Location(world, x, y + 1, z);
             
             // 다른 팀과의 거리 확인
             boolean isSafe = true;
@@ -255,27 +282,37 @@ public class GameManager {
         World world = Bukkit.getWorlds().get(0);
         WorldBorder border = world.getWorldBorder();
         
-        // 초기 크기 설정 (3000x3000)
-        border.setSize(3000);
+        // 중심을 (0, 0)으로 먼저 설정
         border.setCenter(0, 0);
         
-        // 5분마다 수축 시작
+        // 초기 크기 설정 (config에서 읽기)
+        double initialSize = plugin.getConfigManager().getWorldBorderInitialSize();
+        border.setSize(initialSize);
+        
+        Bukkit.broadcastMessage("§e[배틀로얄 2.0] 월드보더가 설정되었습니다: §f" + (int)initialSize + "x" + (int)initialSize);
+        
+        // config에서 수축 설정 읽기
+        long shrinkInterval = plugin.getConfigManager().getWorldBorderShrinkInterval();
+        double shrinkAmount = plugin.getConfigManager().getWorldBorderShrinkAmount();
+        long shrinkDuration = plugin.getConfigManager().getWorldBorderShrinkDuration();
+        double minSize = plugin.getConfigManager().getWorldBorderMinSize();
+        
         worldBorderTask = new BukkitRunnable() {
             @Override
             public void run() {
                 double currentSize = border.getSize();
-                double newSize = currentSize - 600; // 600블럭 축소
+                double newSize = currentSize - shrinkAmount;
                 
-                if (newSize < 500) {
-                    newSize = 500; // 최소 크기
+                if (newSize < minSize) {
+                    newSize = minSize; // 최소 크기
                 }
                 
-                // 1분(60초)에 걸쳐 천천히 축소 - 걸어서 충분히 도망갈 수 있는 속도
-                border.setSize(newSize, 60);
+                // 설정된 시간에 걸쳐 천천히 축소
+                border.setSize(newSize, shrinkDuration);
                 Bukkit.broadcastMessage("§c§l[배틀로얄 2.0] §e자기장이 축소되고 있습니다!");
                 Bukkit.broadcastMessage("§7현재 크기: §f" + (int)currentSize + " §7→ §f" + (int)newSize);
             }
-        }.runTaskTimer(plugin, 5 * 60 * 20L, 5 * 60 * 20L); // 5분마다 실행
+        }.runTaskTimer(plugin, shrinkInterval, shrinkInterval);
     }
     
     /**
@@ -613,12 +650,28 @@ public class GameManager {
                 
                 player.spigot().respawn();
                 player.teleport(spawnLoc);
-                player.setHealth(60.0);
+                
+                // 최대 체력 설정 후 현재 체력 설정
+                double maxHealth = plugin.getConfigManager().getMaxHealth();
+                player.setMaxHealth(maxHealth);
+                player.setHealth(maxHealth);
+                
                 player.setFoodLevel(20);
                 player.setGameMode(GameMode.SURVIVAL);
                 
                 // 인벤토리 절반 삭제
                 randomlyRemoveHalfInventory(player);
+                
+                // 리스폰 시 3초 무적
+                player.setInvulnerable(true);
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        if (player.isOnline()) {
+                            player.setInvulnerable(false);
+                        }
+                    }
+                }.runTaskLater(plugin, 60L); // 3초 (60틱)
                 
                 player.sendMessage("§a[배틀로얄 2.0] 부활했습니다!");
             }

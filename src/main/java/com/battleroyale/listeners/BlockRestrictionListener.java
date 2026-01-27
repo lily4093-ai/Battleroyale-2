@@ -110,6 +110,16 @@ public class BlockRestrictionListener implements Listener {
             return;
         }
         
+        // 잔디, 나뭇잎, 잔디 블록 등 자연물 파괴 허용
+        Material type = block.getType();
+        String typeName = type.name();
+        if (typeName.contains("GRASS") || typeName.contains("LEAVES") || 
+            typeName.contains("FLOWER") || typeName.contains("FERN") ||
+            type == Material.VINE || type == Material.GLOW_LICHEN || 
+            type == Material.SNOW) {
+            return;
+        }
+        
         Location blockLoc = block.getLocation();
         
         // 플레이어가 설치한 블럭만 파괴 가능 (엄폐용 블럭)

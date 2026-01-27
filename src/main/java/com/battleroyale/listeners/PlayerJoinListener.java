@@ -26,8 +26,9 @@ public class PlayerJoinListener implements Listener {
         GameManager gameManager = plugin.getGameManager();
         
         // 최대 체력 60 HP (30하트) 설정
-        player.setMaxHealth(60.0);
-        player.setHealth(60.0);
+        double maxHealth = plugin.getConfigManager().getMaxHealth();
+        player.setMaxHealth(maxHealth);
+        player.setHealth(maxHealth);
         
         // 게임이 진행 중이면 관전자 모드로 전환
         if (gameManager.getGameState() == GameState.ACTIVE || 
