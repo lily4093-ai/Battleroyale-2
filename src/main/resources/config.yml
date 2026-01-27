@@ -1,0 +1,204 @@
+# ====================================
+# 배틀로얄 2.0 플러그인 설정 파일
+# ====================================
+
+# 게임 기본 설정
+game:
+  # 시작 포인트
+  starting-points: 1000
+  
+  # 기본 체력 (하트 수 x 2, 기본 20 = 10하트, 60 = 30하트)
+  max-health: 60.0
+  
+  # 킬 보상 기본값
+  kill-base-reward: 500
+  
+  # 사망 시 포인트 감소 비율 (0.5 = 50%)
+  death-point-penalty: 0.5
+  
+  # 처치자 보상 비율 (0.5 = 50%)
+  killer-reward-ratio: 0.5
+  
+  # 데미지 기여자 보상 비율 (0.5 = 50%)
+  damage-contributor-ratio: 0.5
+
+# 현상금 시스템
+bounty:
+  # 현상금 활성화 시간 (초 단위, 300 = 5분)
+  activation-delay: 300
+  
+  # 현상금 지속 시간 (초 단위, 180 = 3분)
+  duration: 180
+  
+  # 현상금 대상 공격력 배율
+  damage-multiplier: 1.5
+  
+  # 현상금 대상 킬 시 보상 배율
+  reward-multiplier: 2.0
+  
+  # 슬롯머신 연출 시간 (틱 단위, 60 = 3초)
+  slot-machine-duration: 60
+
+# 리스폰 시스템
+respawn:
+  # 일반 리스폰 시간 (초 단위, 60 = 1분)
+  normal-time: 60
+  
+  # 데스타임 리스폰 시간 (초 단위, 30 = 30초)
+  death-time: 30
+  
+  # 리스폰 시 인벤토리 삭제 비율 (0.5 = 50%)
+  inventory-loss-ratio: 0.5
+
+# 데스타임
+death-time:
+  # 데스타임 시작 조건 (최소 사망 횟수)
+  min-deaths: 2
+  
+  # 데스타임 지속 시간 (초 단위, 300 = 5분)
+  duration: 300
+  
+  # 데스타임 공격력 배율
+  damage-multiplier: 1.5
+
+# 월드보더 (자기장)
+world-border:
+  # 초기 크기
+  initial-size: 3000
+  
+  # 축소 간격 (초 단위, 300 = 5분)
+  shrink-interval: 300
+  
+  # 1회 축소량 (블럭)
+  shrink-amount: 600
+  
+  # 축소 소요 시간 (초 단위, 60 = 1분)
+  shrink-duration: 60
+  
+  # 최소 크기
+  min-size: 500
+
+# 보급품 시스템
+supply-drop:
+  # 투하 횟수
+  total-rounds: 3
+  
+  # 투하 간격 (초 단위, 300 = 5분, 첫 투하는 게임 시작 1초 후)
+  interval: 300
+  
+  # 1회당 투하 개수
+  drops-per-round: 100
+  
+  # 투하 간격 (초 단위, 1 = 1초에 1개)
+  drop-interval: 1
+  
+  # 총기 드롭 확률 (0.35 = 35%)
+  gun-chance: 0.35
+  
+  # 부착물 드롭 확률 (슬롯당)
+  attachment-chance: 0.08
+  attachment-max: 2
+  
+  # 음식 드롭 확률 (슬롯당)
+  food-chance: 0.15
+  food-max: 3
+  
+  # 장비 드롭 확률 (슬롯당)
+  equipment-chance: 0.10
+  equipment-max: 2
+  
+  # 조약돌 드롭 확률
+  cobblestone-chance: 0.25
+  cobblestone-amount: 16
+  
+  # 탄약 드롭 확률 (빈 칸당)
+  ammo-chance: 0.06
+
+# 총기 티어별 가중치
+gun-tiers:
+  common: 50
+  uncommon: 30
+  rare: 15
+  epic: 4
+  legendary: 1
+
+# 팀 시스템
+teams:
+  # 같은 팀 스폰 거리 (블럭, 0 = 같은 위치)
+  same-team-spawn-distance: 0
+  
+  # 다른 팀 최소 스폰 거리 (블럭)
+  different-team-min-distance: 100
+  
+  # 팀킬 방지
+  prevent-team-damage: true
+
+# 건축 제한
+building:
+  # 땅파기 금지
+  prevent-digging: true
+  
+  # 타워링 금지 (연속 쌓기 최대 높이)
+  max-vertical-build: 1
+  
+  # 자연 블럭 파괴 금지
+  prevent-natural-break: true
+  
+  # 높이 제한 추적 시간 (틱 단위, 100 = 5초)
+  height-tracking-reset: 100
+
+# UI 설정
+ui:
+  # 스코어보드 업데이트 간격 (틱 단위, 20 = 1초)
+  scoreboard-update-interval: 20
+  
+  # TAB 리스트 업데이트 간격 (틱 단위, 20 = 1초)
+  tab-update-interval: 20
+  
+  # 게임 규칙 표시 딜레이 (틱 단위, 40 = 2초)
+  rules-display-delay: 40
+
+# 메시지 설정
+messages:
+  # 시스템 접두사
+  prefix: "§e[배틀로얄 2.0]"
+  
+  # 게임 시작 메시지
+  game-start: "§a§l게임이 시작되었습니다!"
+  
+  # 게임 종료 메시지
+  game-end: "§6§l게임이 종료되었습니다!"
+  
+  # 데스타임 시작 메시지
+  death-time-start: "§4§l데스타임 시작!"
+
+# 월드 생성 설정
+world-generation:
+  # 동굴 생성
+  generate-caves: false
+  
+  # 바다 생성
+  generate-ocean: false
+  
+  # 강 생성
+  generate-river: true
+  
+  # 기본 지형 높이
+  base-height: 64
+  
+  # 최소 높이
+  min-height: 60
+  
+  # 최대 높이
+  max-height: 80
+
+# 디버그 설정
+debug:
+  # 디버그 모드 (콘솔에 상세 로그 출력)
+  enabled: false
+  
+  # 게임 상태 변경 로그
+  log-state-changes: true
+  
+  # 포인트 변동 로그
+  log-point-changes: true

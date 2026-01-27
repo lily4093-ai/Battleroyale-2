@@ -83,6 +83,12 @@ public class BRCommand implements CommandExecutor, TabCompleter {
                 sendGameInfo(sender, gameManager);
                 break;
                 
+            case "reload":
+                plugin.getConfigManager().reloadConfig();
+                sender.sendMessage("§a[배틀로얄 2.0] 설정 파일을 리로드했습니다!");
+                sender.sendMessage("§7주의: 게임 진행 중에는 일부 설정이 적용되지 않을 수 있습니다.");
+                break;
+                
             default:
                 sendHelp(sender);
                 break;
@@ -99,6 +105,7 @@ public class BRCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/br start <팀원 수> §7- 게임 시작");
         sender.sendMessage("§e/br stop §7- 게임 강제 종료");
         sender.sendMessage("§e/br info §7- 게임 정보 확인");
+        sender.sendMessage("§e/br reload §7- 설정 파일 리로드");
         sender.sendMessage("§6§l================================");
     }
     
@@ -140,7 +147,7 @@ public class BRCommand implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
         
         if (args.length == 1) {
-            completions.addAll(Arrays.asList("start", "stop", "info"));
+            completions.addAll(Arrays.asList("start", "stop", "info", "reload"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             completions.addAll(Arrays.asList("1", "2", "3", "4", "5"));
         }

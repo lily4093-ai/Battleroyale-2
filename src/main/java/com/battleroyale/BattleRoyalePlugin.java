@@ -1,6 +1,7 @@
 package com.battleroyale;
 
 import com.battleroyale.commands.BRCommand;
+import com.battleroyale.config.ConfigManager;
 import com.battleroyale.game.GameManager;
 import com.battleroyale.listeners.*;
 import com.battleroyale.supply.SupplyDropManager;
@@ -11,6 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class BattleRoyalePlugin extends JavaPlugin {
     
     private static BattleRoyalePlugin instance;
+    private ConfigManager configManager;
     private GameManager gameManager;
     private SupplyDropManager supplyDropManager;
     
@@ -18,8 +20,8 @@ public class BattleRoyalePlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         
-        // Save default config
-        saveDefaultConfig();
+        // 설정 파일 로드
+        configManager = new ConfigManager(this);
         
         // Initialize managers
         gameManager = new GameManager(this);
@@ -66,5 +68,9 @@ public class BattleRoyalePlugin extends JavaPlugin {
     
     public SupplyDropManager getSupplyDropManager() {
         return supplyDropManager;
+    }
+    
+    public ConfigManager getConfigManager() {
+        return configManager;
     }
 }
