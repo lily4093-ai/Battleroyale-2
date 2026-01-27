@@ -295,17 +295,17 @@ public class SupplyLootGenerator {
      */
     private ItemStack getRandomAmmo(String preferredAmmo) {
         Map<String, String> ammoIdMap = new HashMap<>();
-        ammoIdMap.put("50ae", "tacz:ammo_50ae");
-        ammoIdMap.put("9mm", "tacz:ammo_9mm");
-        ammoIdMap.put("357mag", "tacz:ammo_357mag");
-        ammoIdMap.put("45acp", "tacz:ammo_45acp");
-        ammoIdMap.put("556x45", "tacz:ammo_556x45");
-        ammoIdMap.put("30_06", "tacz:ammo_30_06");
-        ammoIdMap.put("338", "tacz:ammo_338");
-        ammoIdMap.put("50bmg", "tacz:ammo_50bmg");
-        ammoIdMap.put("762x39", "tacz:ammo_762x39");
-        ammoIdMap.put("12g", "tacz:ammo_12g");
-        ammoIdMap.put("rpg_rocket", "tacz:ammo_rpg_rocket");
+        ammoIdMap.put("50ae", "tacz:50ae");
+        ammoIdMap.put("9mm", "tacz:9mm");
+        ammoIdMap.put("357mag", "tacz:357mag");
+        ammoIdMap.put("45acp", "tacz:45acp");
+        ammoIdMap.put("556x45", "tacz:556x45");
+        ammoIdMap.put("30_06", "tacz:30_06");
+        ammoIdMap.put("338", "tacz:338");
+        ammoIdMap.put("50bmg", "tacz:50bmg");
+        ammoIdMap.put("762x39", "tacz:762x39");
+        ammoIdMap.put("12g", "tacz:12g");
+        ammoIdMap.put("rpg_rocket", "tacz:rpg_rocket");
         
         Map<String, Integer> ammoMaxCounts = new HashMap<>();
         ammoMaxCounts.put("50ae", 48);

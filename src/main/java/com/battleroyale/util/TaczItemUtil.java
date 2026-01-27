@@ -19,6 +19,8 @@ import java.lang.reflect.Method;
  */
 public class TaczItemUtil {
 
+    private static boolean hasWarned = false;
+
     /**
      * TACZ 총기 아이템 생성
      * 
@@ -60,16 +62,22 @@ public class TaczItemUtil {
             ItemStack item = createItemFromNBT(nbtString.toString());
 
             if (item != null && item.getType() != Material.AIR) {
-                Bukkit.getLogger().info("[BattleRoyale] TACZ 총기 생성 성공: " + gunId);
                 return item;
             }
 
-            Bukkit.getLogger().warning("[BattleRoyale] TACZ 총기 생성 실패, 플레이스홀더 반환: " + gunId);
+            // 경고 메시지 한 번만 출력
+            if (!hasWarned) {
+                Bukkit.getLogger().warning("[BattleRoyale] TACZ 총기 생성 실패 - 플레이스홀더로 대체됩니다");
+                Bukkit.getLogger().warning("[BattleRoyale] Arclight 서버에서 TACZ 모드가 제대로 로드되었는지 확인하세요");
+                hasWarned = true;
+            }
             return createPlaceholderGun(gunId, currentAmmo, fireMode);
 
         } catch (Exception e) {
-            Bukkit.getLogger().warning("[BattleRoyale] TACZ 총기 생성 중 오류: " + gunId);
-            e.printStackTrace();
+            if (!hasWarned) {
+                Bukkit.getLogger().warning("[BattleRoyale] TACZ 총기 생성 중 오류 발생");
+                hasWarned = true;
+            }
             return createPlaceholderGun(gunId, currentAmmo, fireMode);
         }
     }
@@ -130,36 +138,83 @@ public class TaczItemUtil {
     }
 
     /**
-     * NBT 문자열로부터 ItemStack 생성 (Reflection 사용)
+     * NBT 문자열로부터 ItemStack 생성 (Arclight 호환)
      */
     private static ItemStack createItemFromNBT(String nbtString) {
         try {
-            // CraftItemStack 클래스 가져오기
-            Class<?> craftItemStackClass = Class.forName("org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack");
+            // 1. NBT 파싱
+            Object compoundTag = parseNBT(nbtString);
+            if (compoundTag == null) return null;
 
-            // MojangsonParser 클래스 가져오기 (NBT 문자열 파싱)
-            Class<?> mojangsonParserClass = Class.forName("net.minecraft.nbt.MojangsonParser");
-            Method parseMethod = mojangsonParserClass.getMethod("parse", String.class);
+            // 2. NMS ItemStack 생성
+            Object nmsStack = createNMSStack(compoundTag);
+            if (nmsStack == null) return null;
 
-            // NBT 문자열을 CompoundTag로 파싱
-            Object compoundTag = parseMethod.invoke(null, nbtString);
-
-            // NMS ItemStack 클래스 가져오기
-            Class<?> nmsItemStackClass = Class.forName("net.minecraft.world.item.ItemStack");
-
-            // CompoundTag로부터 NMS ItemStack 생성
-            Method ofMethod = nmsItemStackClass.getMethod("of", Class.forName("net.minecraft.nbt.CompoundTag"));
-            Object nmsStack = ofMethod.invoke(null, compoundTag);
-
-            // NMS ItemStack을 Bukkit ItemStack으로 변환
-            Method asBukkitCopyMethod = craftItemStackClass.getMethod("asBukkitCopy", nmsItemStackClass);
-            ItemStack bukkitStack = (ItemStack) asBukkitCopyMethod.invoke(null, nmsStack);
-
-            return bukkitStack;
+            // 3. Bukkit ItemStack으로 변환
+            return convertToBukkit(nmsStack);
 
         } catch (Exception e) {
-            Bukkit.getLogger().warning("[BattleRoyale] NBT 문자열로부터 아이템 생성 실패");
-            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * NBT 문자열 파싱 (Arclight 호환)
+     */
+    private static Object parseNBT(String nbtString) {
+        try {
+            // MojangsonParser 찾기
+            Class<?> parserClass = Class.forName("net.minecraft.nbt.MojangsonParser");
+
+            // parse 메서드 찾기 (메서드 이름이 다를 수 있음)
+            for (Method m : parserClass.getDeclaredMethods()) {
+                if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) &&
+                    m.getParameterCount() == 1 &&
+                    m.getParameterTypes()[0] == String.class) {
+                    m.setAccessible(true);
+                    return m.invoke(null, nbtString);
+                }
+            }
+        } catch (Exception e) {
+            // 실패 시 null 반환
+        }
+        return null;
+    }
+
+    /**
+     * CompoundTag로부터 NMS ItemStack 생성
+     */
+    private static Object createNMSStack(Object compoundTag) {
+        try {
+            Class<?> nmsItemStackClass = Class.forName("net.minecraft.world.item.ItemStack");
+            Class<?> compoundTagClass = Class.forName("net.minecraft.nbt.CompoundTag");
+
+            // of 메서드 찾기 (정적 메서드)
+            for (Method m : nmsItemStackClass.getDeclaredMethods()) {
+                if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) &&
+                    m.getParameterCount() == 1 &&
+                    compoundTagClass.isAssignableFrom(m.getParameterTypes()[0])) {
+                    m.setAccessible(true);
+                    return m.invoke(null, compoundTag);
+                }
+            }
+        } catch (Exception e) {
+            // 실패 시 null 반환
+        }
+        return null;
+    }
+
+    /**
+     * NMS ItemStack을 Bukkit ItemStack으로 변환
+     */
+    private static ItemStack convertToBukkit(Object nmsStack) {
+        try {
+            Class<?> craftItemStackClass = Class.forName("org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemStack");
+            Class<?> nmsItemStackClass = Class.forName("net.minecraft.world.item.ItemStack");
+
+            Method asBukkitCopyMethod = craftItemStackClass.getMethod("asBukkitCopy", nmsItemStackClass);
+            return (ItemStack) asBukkitCopyMethod.invoke(null, nmsStack);
+        } catch (Exception e) {
             return null;
         }
     }

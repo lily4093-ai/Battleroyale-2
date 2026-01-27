@@ -2,9 +2,14 @@ name: BattleRoyale2
 version: '${project.version}'
 main: com.battleroyale.BattleRoyalePlugin
 api-version: '1.20'
+load: STARTUP
 prefix: 배틀로얄 2.0
 authors: [BattleRoyale Team]
 description: Battle Royale plugin with TACZ integration
+
+world-generators:
+  BattleRoyale:
+    generator: com.battleroyale.world.BRWorldGenerator
 
 commands:
   br:

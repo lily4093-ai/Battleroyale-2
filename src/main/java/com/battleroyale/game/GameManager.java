@@ -9,6 +9,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -175,16 +178,19 @@ public class GameManager {
                 Player player = Bukkit.getPlayer(playerId);
                 if (player != null) {
                     player.teleport(spawnLoc);
-                    
+
                     // 최대 체력 설정 후 현재 체력 설정
                     double maxHealth = plugin.getConfigManager().getMaxHealth();
                     player.setMaxHealth(maxHealth);
                     player.setHealth(maxHealth);
-                    
+
                     player.setFoodLevel(20);
                     player.getInventory().clear();
                     player.setGameMode(GameMode.SURVIVAL);
-                    
+
+                    // 보급품 탐지 나침반 지급
+                    giveSupplyCompass(player);
+
                     // 스폰 시 3초 무적 (낙하 데미지 방지)
                     player.setInvulnerable(true);
                     new BukkitRunnable() {
@@ -320,6 +326,9 @@ public class GameManager {
      * 게임 시작 직후 1회, 이후 5분마다 총 3회
      */
     private void scheduleSupplyDrops() {
+        // 나침반 업데이트 시작
+        plugin.getSupplyDropManager().startCompassUpdater();
+
         // 1차 투하 - 게임 시작 직후
         new BukkitRunnable() {
             @Override
@@ -771,7 +780,10 @@ public class GameManager {
         
         // TAB 리스트 중지
         tabListManager.stopUpdating();
-        
+
+        // 보급품 시스템 정리
+        plugin.getSupplyDropManager().cleanup();
+
         playerDataMap.clear();
         teams.clear();
         initialPlayers.clear();
@@ -809,5 +821,22 @@ public class GameManager {
     
     public long getDeathTimeStartTime() {
         return deathTimeStartTime;
+    }
+
+    /**
+     * 플레이어에게 보급품 탐지 나침반 지급
+     */
+    private void giveSupplyCompass(Player player) {
+        ItemStack compass = new ItemStack(Material.COMPASS);
+        ItemMeta meta = compass.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName("§e§l보급품 탐지기");
+            meta.setLore(Arrays.asList(
+                    "§7가장 가까운 미개봉 보급품을 가리킵니다",
+                    "§7열린 보급품은 자동으로 제외됩니다"
+            ));
+            compass.setItemMeta(meta);
+        }
+        player.getInventory().addItem(compass);
     }
 }

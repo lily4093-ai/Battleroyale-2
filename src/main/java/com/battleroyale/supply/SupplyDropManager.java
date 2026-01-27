@@ -25,12 +25,17 @@ public class SupplyDropManager {
     private final SupplyLootGenerator lootGenerator;
     private BossBar supplyBossBar;
     private BukkitTask supplyTask;
+    private BukkitTask compassTask;
     private int dropCount;
     private int totalDropsThisRound;
     private int completedDropsThisRound;
 
+    // 보급품 위치 추적
+    private final Set<Location> supplyCrateLocations = new HashSet<>();
+    private final Set<Location> openedSupplyCrates = new HashSet<>();
+
     private static final int DROPS_PER_ROUND = 100; // 1회당 100개
-    private static final int DROP_INTERVAL = 2; // 0.1초 (2틱) - 초당 10개
+    private static final int DROP_INTERVAL = 60; // 3초 (60틱) - 3초마다 2개
 
     public SupplyDropManager(BattleRoyalePlugin plugin) {
         this.plugin = plugin;
@@ -52,11 +57,11 @@ public class SupplyDropManager {
         completedDropsThisRound = 0;
 
         Bukkit.broadcastMessage("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 시작됩니다!");
-        Bukkit.broadcastMessage("§7초당 10개의 보급 상자가 투하됩니다.");
+        Bukkit.broadcastMessage("§73초마다 2개의 보급 상자가 투하됩니다.");
 
         createSupplyBossBar();
 
-        // 즉시 투하 루프 시작
+        // 즉시 투하 루프 시작 (3초마다 2개)
         supplyTask = new BukkitRunnable() {
             @Override
             public void run() {
@@ -65,15 +70,20 @@ public class SupplyDropManager {
                     return;
                 }
 
-                // 비동기로 위치 찾기 및 투하
+                // 3초마다 2개씩 투하
                 scheduleAsyncDrop();
                 totalDropsThisRound++;
+
+                if (totalDropsThisRound < DROPS_PER_ROUND) {
+                    scheduleAsyncDrop();
+                    totalDropsThisRound++;
+                }
             }
         }.runTaskTimer(plugin, 0L, DROP_INTERVAL);
     }
 
     /**
-     * 비동기로 위치를 찾고 보급품을 투하함
+     * 보급품 투하 처리 (Arclight 호환)
      */
     private void scheduleAsyncDrop() {
         World world = Bukkit.getWorlds().get(0);
@@ -84,23 +94,24 @@ public class SupplyDropManager {
         double x = (random.nextDouble() * size * 2) - size;
         double z = (random.nextDouble() * size * 2) - size;
 
-        // Paper/Spigot의 비동기 청크 로딩 사용 (서버 랙 방지)
-        world.getChunkAtAsync((int) x >> 4, (int) z >> 4).thenAccept(chunk -> {
-            // 메인 스레드에서 블록 설치
-            plugin.getServer().getScheduler().runTask(plugin, () -> {
-                Location loc = findGroundLocationAt(world, x, z);
-                if (loc != null) {
-                    dropSupplyCrateAt(loc);
-                    completedDropsThisRound++;
-                    updateSupplyBossBar();
+        // 청크 로드 (동기 방식 - Arclight 호환)
+        int chunkX = (int) x >> 4;
+        int chunkZ = (int) z >> 4;
+        if (!world.isChunkLoaded(chunkX, chunkZ)) {
+            world.loadChunk(chunkX, chunkZ);
+        }
 
-                    // 모든 투하가 완료되었는지 체크
-                    if (completedDropsThisRound >= DROPS_PER_ROUND) {
-                        finishSupplyDrop(1); // 라운드 번호는 적절히 처리 필요
-                    }
-                }
-            });
-        });
+        Location loc = findGroundLocationAt(world, x, z);
+        if (loc != null) {
+            dropSupplyCrateAt(loc);
+            completedDropsThisRound++;
+            updateSupplyBossBar();
+
+            // 모든 투하가 완료되었는지 체크
+            if (completedDropsThisRound >= DROPS_PER_ROUND) {
+                finishSupplyDrop(1);
+            }
+        }
     }
 
     /**
@@ -130,6 +141,10 @@ public class SupplyDropManager {
         // 루팅 생성
         Inventory inventory = chest.getInventory();
         lootGenerator.generateLoot(inventory);
+
+        // 보급품 위치 추적
+        Location blockLoc = dropLocation.getBlock().getLocation();
+        supplyCrateLocations.add(blockLoc);
 
         // 파티클 효과
         dropLocation.getWorld().spawnParticle(
@@ -168,9 +183,9 @@ public class SupplyDropManager {
         if (supplyBossBar == null)
             return;
 
-        double progress = (double) totalDropsThisRound / DROPS_PER_ROUND;
+        double progress = (double) completedDropsThisRound / DROPS_PER_ROUND;
         supplyBossBar.setProgress(Math.min(1.0, progress));
-        supplyBossBar.setTitle("§a§l보급품 투하: §f" + totalDropsThisRound + " / " + DROPS_PER_ROUND);
+        supplyBossBar.setTitle("§a§l보급품 투하 §f| §e" + completedDropsThisRound + "§f개 투하 완료됨");
     }
 
     /**
@@ -199,9 +214,105 @@ public class SupplyDropManager {
             supplyTask.cancel();
         }
 
+        if (compassTask != null) {
+            compassTask.cancel();
+        }
+
         if (supplyBossBar != null) {
             supplyBossBar.removeAll();
             supplyBossBar = null;
+        }
+
+        supplyCrateLocations.clear();
+        openedSupplyCrates.clear();
+    }
+
+    /**
+     * 보급 상자가 열렸음을 기록
+     */
+    public void markSupplyOpened(Location location) {
+        Location blockLoc = location.getBlock().getLocation();
+        if (supplyCrateLocations.contains(blockLoc)) {
+            openedSupplyCrates.add(blockLoc);
+        }
+    }
+
+    /**
+     * 특정 위치가 보급 상자인지 확인
+     */
+    public boolean isSupplyCrate(Location location) {
+        return supplyCrateLocations.contains(location.getBlock().getLocation());
+    }
+
+    /**
+     * 플레이어에게 가장 가까운 열리지 않은 보급품 위치 반환
+     */
+    public Location getNearestUnopenedSupply(Player player) {
+        Location playerLoc = player.getLocation();
+        Location nearest = null;
+        double nearestDist = Double.MAX_VALUE;
+
+        for (Location loc : supplyCrateLocations) {
+            // 이미 열린 보급품은 제외
+            if (openedSupplyCrates.contains(loc)) {
+                continue;
+            }
+
+            // 같은 월드인지 확인
+            if (!loc.getWorld().equals(playerLoc.getWorld())) {
+                continue;
+            }
+
+            // 실제 도달 가능한 거리 계산 (X, Z만 고려, Y는 무시)
+            double dx = loc.getX() - playerLoc.getX();
+            double dz = loc.getZ() - playerLoc.getZ();
+            double dist = dx * dx + dz * dz; // distanceSquared와 동일하지만 Y 제외
+
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearest = loc;
+            }
+        }
+
+        return nearest;
+    }
+
+    /**
+     * 나침반 업데이트 시작
+     */
+    public void startCompassUpdater() {
+        if (compassTask != null && !compassTask.isCancelled()) {
+            return;
+        }
+
+        compassTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    if (player.getGameMode() != GameMode.SURVIVAL) {
+                        continue;
+                    }
+
+                    Location nearest = getNearestUnopenedSupply(player);
+                    if (nearest != null) {
+                        // 나침반이 현재 가리키는 위치와 다르면 업데이트
+                        Location currentTarget = player.getCompassTarget();
+                        if (currentTarget == null || !currentTarget.equals(nearest)) {
+                            player.setCompassTarget(nearest);
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 10L); // 0.5초(10틱)마다 업데이트
+    }
+
+    /**
+     * 나침반 업데이트 중지
+     */
+    public void stopCompassUpdater() {
+        if (compassTask != null) {
+            compassTask.cancel();
+            compassTask = null;
         }
     }
 }
