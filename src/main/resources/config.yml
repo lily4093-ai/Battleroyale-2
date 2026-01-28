@@ -64,19 +64,27 @@ death-time:
 # 월드보더 (자기장)
 world-border:
   # 초기 크기
-  initial-size: 3000
-  
-  # 축소 간격 (초 단위, 300 = 5분)
-  shrink-interval: 300
-  
-  # 1회 축소량 (블럭)
-  shrink-amount: 600
-  
-  # 축소 소요 시간 (초 단위, 60 = 1분)
-  shrink-duration: 60
-  
-  # 최소 크기
-  min-size: 500
+  initial-size: 2500
+
+  # 축소 간격 (초 단위, 60 = 1분)
+  shrink-interval: 60
+
+  # 축소 단계별 크기 (순서대로 축소)
+  shrink-stages:
+    - 2500
+    - 2000
+    - 1500
+    - 1000
+    - 500
+    - 100
+    - 10
+    - 0
+
+  # 축소 소요 시간 (초 단위, 1.7초)
+  shrink-duration: 1.7
+
+  # 최소 크기 (0 = 게임 종료)
+  min-size: 0
 
 # 보급품 시스템
 supply-drop:
@@ -93,7 +101,7 @@ supply-drop:
   drop-interval: 1
   
   # 총기 드롭 확률 (0.35 = 35%)
-  gun-chance: 0.35
+  gun-chance: 0.45
   
   # 부착물 드롭 확률 (슬롯당)
   attachment-chance: 0.08
@@ -112,15 +120,15 @@ supply-drop:
   cobblestone-amount: 16
   
   # 탄약 드롭 확률 (빈 칸당)
-  ammo-chance: 0.06
+  ammo-chance: 0.09
 
 # 총기 티어별 가중치
 gun-tiers:
-  common: 50
-  uncommon: 30
-  rare: 15
-  epic: 4
-  legendary: 1
+  common: 35
+  uncommon: 35
+  rare: 20
+  epic: 7
+  legendary: 3
 
 # 팀 시스템
 teams:

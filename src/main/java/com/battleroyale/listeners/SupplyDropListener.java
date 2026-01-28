@@ -32,9 +32,12 @@ public class SupplyDropListener implements Listener {
             org.bukkit.block.Chest chest = (org.bukkit.block.Chest) holder;
             Block block = chest.getBlock();
 
-            // 보급품 상자인지 확인하고 열림 상태로 표시
+            // 보급품 상자인지 확인
             if (plugin.getSupplyDropManager().isSupplyCrate(block.getLocation())) {
+                // 열림 상태로 표시 (나침반에서 제외)
                 plugin.getSupplyDropManager().markSupplyOpened(block.getLocation());
+
+                // 상자는 파괴하지 않고 그대로 둠 (열린 상태로만 표시)
             }
         }
     }

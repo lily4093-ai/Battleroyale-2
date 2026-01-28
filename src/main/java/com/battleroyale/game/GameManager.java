@@ -56,6 +56,7 @@ public class GameManager {
     // 스코어보드
     private ScoreboardManager scoreboardManager;
     private TabListManager tabListManager;
+    private WorldBorderActionBarManager worldBorderActionBarManager;
 
     public GameManager(BattleRoyalePlugin plugin) {
         this.plugin = plugin;
@@ -66,6 +67,7 @@ public class GameManager {
         this.isDeathTime = false;
         this.scoreboardManager = new ScoreboardManager(plugin, this);
         this.tabListManager = new TabListManager(plugin, this);
+        this.worldBorderActionBarManager = new WorldBorderActionBarManager(plugin);
     }
 
     /**
@@ -127,6 +129,9 @@ public class GameManager {
 
         // TAB 리스트 시작
         tabListManager.startUpdating();
+
+        // 월드보더 액션바 시작
+        worldBorderActionBarManager.startUpdating();
     }
 
     /**
@@ -284,7 +289,8 @@ public class GameManager {
 
     /**
      * 월드보더 설정 및 축소
-     * 5분마다 1분 동안 600블럭씩 수축 (3000 → 2400 → 1800 → 1200)
+     * 단계별로 축소: 2500 → 2000 → 1500 → 1000 → 500 → 100 → 10 → 0
+     * 축소 후 60초 대기, 초당 1.7블럭 속도로 축소
      */
     private void setupWorldBorder() {
         World world = Bukkit.getWorlds().get(0);
@@ -300,25 +306,38 @@ public class GameManager {
         Bukkit.broadcastMessage("§e[배틀로얄 2.0] 월드보더가 설정되었습니다: §f" + (int) initialSize + "x" + (int) initialSize);
 
         // config에서 수축 설정 읽기
-        long shrinkInterval = plugin.getConfigManager().getWorldBorderShrinkInterval();
-        double shrinkAmount = plugin.getConfigManager().getWorldBorderShrinkAmount();
-        long shrinkDuration = plugin.getConfigManager().getWorldBorderShrinkDuration();
-        double minSize = plugin.getConfigManager().getWorldBorderMinSize();
+        long shrinkInterval = plugin.getConfigManager().getWorldBorderShrinkInterval() * 20L; // 초를 틱으로 변환
+        List<Integer> shrinkStages = plugin.getConfigManager().getWorldBorderShrinkStages();
 
+        // 단계별 축소 스케줄
         worldBorderTask = new BukkitRunnable() {
+            int currentStageIndex = 0;
+
             @Override
             public void run() {
-                double currentSize = border.getSize();
-                double newSize = currentSize - shrinkAmount;
-
-                if (newSize < minSize) {
-                    newSize = minSize; // 최소 크기
+                if (currentStageIndex >= shrinkStages.size() - 1) {
+                    // 마지막 단계 (0)에 도달하면 게임 종료
+                    cancel();
+                    Bukkit.broadcastMessage("§c§l[배틀로얄 2.0] §e자기장이 완전히 축소되었습니다! 게임 종료!");
+                    endGame();
+                    return;
                 }
+
+                currentStageIndex++;
+                double currentSize = border.getSize();
+                double newSize = shrinkStages.get(currentStageIndex);
+
+                // 축소할 거리 계산 (반지름 기준)
+                double shrinkDistance = (currentSize - newSize) / 2;
+
+                // 초당 1.7블럭 속도로 축소 시간 계산
+                long shrinkDuration = (long) (shrinkDistance / 1.7);
+
+                // 액션바 매니저에 축소 시작 알림
+                worldBorderActionBarManager.notifyShrinkStart(currentSize, newSize, shrinkDuration);
 
                 // 설정된 시간에 걸쳐 천천히 축소
                 border.setSize(newSize, shrinkDuration);
-                Bukkit.broadcastMessage("§c§l[배틀로얄 2.0] §e자기장이 축소되고 있습니다!");
-                Bukkit.broadcastMessage("§7현재 크기: §f" + (int) currentSize + " §7→ §f" + (int) newSize);
             }
         }.runTaskTimer(plugin, shrinkInterval, shrinkInterval);
     }
@@ -786,6 +805,9 @@ public class GameManager {
 
         // TAB 리스트 중지
         tabListManager.stopUpdating();
+
+        // 월드보더 액션바 중지
+        worldBorderActionBarManager.stopUpdating();
 
         // 보급품 시스템 정리
         plugin.getSupplyDropManager().cleanup();

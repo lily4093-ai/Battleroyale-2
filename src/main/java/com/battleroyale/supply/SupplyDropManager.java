@@ -83,7 +83,7 @@ public class SupplyDropManager {
     }
 
     /**
-     * 보급품 투하 처리 (비동기 청크 로드로 렉 방지)
+     * 보급품 투하 처리 (Arclight 호환성)
      */
     private void scheduleAsyncDrop() {
         World world = Bukkit.getWorlds().get(0);
@@ -94,40 +94,25 @@ public class SupplyDropManager {
         double x = (random.nextDouble() * size * 2) - size;
         double z = (random.nextDouble() * size * 2) - size;
 
-        // 청크 비동기 로드 (렉 방지)
+        // 청크 로드 (Arclight 호환성을 위해 동기 방식 사용)
         int chunkX = (int) x >> 4;
         int chunkZ = (int) z >> 4;
 
         if (!world.isChunkLoaded(chunkX, chunkZ)) {
-            // 비동기로 청크 로드 후 보급품 투하
-            world.getChunkAtAsync(chunkX, chunkZ).thenAccept(chunk -> {
-                Location loc = findGroundLocationAt(world, x, z);
-                if (loc != null) {
-                    // 메인 스레드에서 블록 설정
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        dropSupplyCrateAt(loc);
-                        completedDropsThisRound++;
-                        updateSupplyBossBar();
+            // 청크가 로드되지 않은 경우 로드
+            world.loadChunk(chunkX, chunkZ);
+        }
 
-                        // 모든 투하가 완료되었는지 체크
-                        if (completedDropsThisRound >= DROPS_PER_ROUND) {
-                            finishSupplyDrop(1);
-                        }
-                    });
-                }
-            });
-        } else {
-            // 이미 로드된 청크는 즉시 처리
-            Location loc = findGroundLocationAt(world, x, z);
-            if (loc != null) {
-                dropSupplyCrateAt(loc);
-                completedDropsThisRound++;
-                updateSupplyBossBar();
+        // 보급품 투하
+        Location loc = findGroundLocationAt(world, x, z);
+        if (loc != null) {
+            dropSupplyCrateAt(loc);
+            completedDropsThisRound++;
+            updateSupplyBossBar();
 
-                // 모든 투하가 완료되었는지 체크
-                if (completedDropsThisRound >= DROPS_PER_ROUND) {
-                    finishSupplyDrop(1);
-                }
+            // 모든 투하가 완료되었는지 체크
+            if (completedDropsThisRound >= DROPS_PER_ROUND) {
+                finishSupplyDrop(1);
             }
         }
     }
@@ -246,6 +231,7 @@ public class SupplyDropManager {
         Location blockLoc = location.getBlock().getLocation();
         if (supplyCrateLocations.contains(blockLoc)) {
             openedSupplyCrates.add(blockLoc);
+            // supplyCrateLocations.remove(blockLoc); // cleanupDestroyedCrates에서 처리하도록 둠
         }
     }
 
@@ -264,8 +250,14 @@ public class SupplyDropManager {
         Location nearest = null;
         double nearestDist = Double.MAX_VALUE;
 
+        // 월드보더 정보 가져오기
+        World world = playerLoc.getWorld();
+        WorldBorder border = world.getWorldBorder();
+        Location borderCenter = border.getCenter();
+        double borderRadius = border.getSize() / 2.0;
+
         for (Location loc : supplyCrateLocations) {
-            // 이미 열린 보급품은 제외
+            // 이미 열린/파괴된 보급품은 제외
             if (openedSupplyCrates.contains(loc)) {
                 continue;
             }
@@ -275,9 +267,18 @@ public class SupplyDropManager {
                 continue;
             }
 
-            // 실제 도달 가능한 거리 계산 (X, Z만 고려, Y는 무시)
-            double dx = loc.getX() - playerLoc.getX();
-            double dz = loc.getZ() - playerLoc.getZ();
+            // 월드보더 밖의 보급품은 제외
+            double dx = loc.getX() - borderCenter.getX();
+            double dz = loc.getZ() - borderCenter.getZ();
+            double distFromCenter = Math.sqrt(dx * dx + dz * dz);
+
+            if (distFromCenter > borderRadius) {
+                continue; // 월드보더 밖
+            }
+
+            // 플레이어와의 거리 계산 (X, Z만 고려, Y는 무시)
+            dx = loc.getX() - playerLoc.getX();
+            dz = loc.getZ() - playerLoc.getZ();
             double dist = dx * dx + dz * dz; // distanceSquared와 동일하지만 Y 제외
 
             if (dist < nearestDist) {
@@ -298,8 +299,20 @@ public class SupplyDropManager {
         }
 
         compassTask = new BukkitRunnable() {
+            private int cleanupCounter = 0;
+
             @Override
             public void run() {
+                // 파괴된 상자 정리 - 매 100틱(5초)마다만 수행하여 부하 감소
+                cleanupCounter++;
+                if (cleanupCounter >= 20) { // 5틱 * 20 = 100틱
+                    cleanupDestroyedCrates();
+                    cleanupCounter = 0;
+                }
+
+                if (supplyCrateLocations.isEmpty())
+                    return;
+
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (player.getGameMode() != GameMode.SURVIVAL) {
                         continue;
@@ -307,15 +320,44 @@ public class SupplyDropManager {
 
                     Location nearest = getNearestUnopenedSupply(player);
                     if (nearest != null) {
-                        // 나침반이 현재 가리키는 위치와 다르면 업데이트
-                        Location currentTarget = player.getCompassTarget();
-                        if (currentTarget == null || !currentTarget.equals(nearest)) {
-                            player.setCompassTarget(nearest);
-                        }
+                        player.setCompassTarget(nearest);
                     }
                 }
             }
-        }.runTaskTimer(plugin, 0L, 10L); // 0.5초(10틱)마다 업데이트
+        }.runTaskTimer(plugin, 0L, 5L);
+    }
+
+    /**
+     * 파괴된 상자들을 정리
+     */
+    private void cleanupDestroyedCrates() {
+        if (supplyCrateLocations.isEmpty())
+            return;
+
+        Iterator<Location> iterator = supplyCrateLocations.iterator();
+        while (iterator.hasNext()) {
+            Location loc = iterator.next();
+            if (loc.getWorld() == null)
+                continue;
+
+            // 이미 열린 것으로 표시된 경우 제거
+            if (openedSupplyCrates.contains(loc)) {
+                iterator.remove();
+                continue;
+            }
+
+            // 청크가 로드된 경우에만 블록 확인 (Arclight/Forge 지연 방지)
+            int chunkX = loc.getBlockX() >> 4;
+            int chunkZ = loc.getBlockZ() >> 4;
+
+            if (loc.getWorld().isChunkLoaded(chunkX, chunkZ)) {
+                Material type = loc.getBlock().getType();
+                if (type == Material.AIR || type != Material.CHEST) {
+                    openedSupplyCrates.add(loc);
+                    iterator.remove();
+                }
+            }
+        }
     }
 
     /**
