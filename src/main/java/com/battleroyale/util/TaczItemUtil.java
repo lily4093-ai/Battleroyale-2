@@ -3,7 +3,6 @@ package com.battleroyale.util;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 import java.lang.reflect.Method;
 
@@ -136,6 +135,51 @@ public class TaczItemUtil {
             e.printStackTrace();
             return createPlaceholderAmmo(ammoId, amount);
         }
+    }
+
+    /**
+     * TACZ 탄약 상자 아이템 생성
+     * 
+     * @param level 레벨 (0, 1, 2)
+     * @return TACZ 탄약 상자 ItemStack
+     */
+    public static ItemStack createAmmoBox(int level) {
+        try {
+            // NBT 문자열 생성
+            String nbtString = "{id:\"tacz:ammo_box\",Count:1b,tag:{Level:" + level + "}}";
+
+            // NBT 문자열로부터 ItemStack 생성
+            ItemStack item = createItemFromNBT(nbtString);
+
+            if (item != null && item.getType() != Material.AIR) {
+                return item;
+            }
+
+            return createPlaceholderAmmoBox(level);
+
+        } catch (Exception e) {
+            Bukkit.getLogger().warning("[BattleRoyale] TACZ 탄약 상자 생성 중 오류: Level " + level);
+            e.printStackTrace();
+            return createPlaceholderAmmoBox(level);
+        }
+    }
+
+    /**
+     * 플레이스홀더 탄약 상자 생성
+     */
+    private static ItemStack createPlaceholderAmmoBox(int level) {
+        ItemStack item = new ItemStack(Material.CHEST);
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+
+        if (meta != null) {
+            meta.setDisplayName("§fTACZ Ammo Box (Level " + level + ")");
+            meta.setLore(java.util.Arrays.asList(
+                    "§7레벨: §e" + level,
+                    "§c[플레이스홀더 - TACZ 로드 필요]"));
+            item.setItemMeta(meta);
+        }
+
+        return item;
     }
 
     /**

@@ -10,9 +10,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 보급품 투하 시스템 관리
@@ -28,11 +27,11 @@ public class SupplyDropManager {
     private BukkitTask compassTask;
     private int totalDrops;
 
-    // 보급품 위치 추적
-    private final Set<Location> supplyCrateLocations = new HashSet<>();
-    private final Set<Location> openedSupplyCrates = new HashSet<>();
-
-    private static final int DROP_INTERVAL = 40; // 2초 (40틱)
+    // 보급품 위치 추적 (좌표 문자열 사용: "world:x:y:z")
+    private final Set<String> supplyCrateLocations = new HashSet<>();
+    private final Set<String> openedSupplyCrates = new HashSet<>();
+    private final Set<String> pendingSupplyLocations = new HashSet<>();
+    private final Map<String, Location> locationMap = new HashMap<>(); // 키 -> 로케이션 매핑
 
     public SupplyDropManager(BattleRoyalePlugin plugin) {
         this.plugin = plugin;
@@ -55,13 +54,36 @@ public class SupplyDropManager {
 
         createSupplyBossBar();
 
-        // 2초마다 1개씩 투하 (무한 루프)
+        // 인원수에 따른 투하 간격 조정 태스크 (1초마다 체크)
         supplyTask = new BukkitRunnable() {
+            private int ticksUntilNextDrop = 0;
+
             @Override
             public void run() {
-                processSupplyDrop();
+                List<Player> survivalPlayers = Bukkit.getOnlinePlayers().stream()
+                        .filter(p -> p.getGameMode() == GameMode.SURVIVAL)
+                        .collect(Collectors.toList());
+
+                if (survivalPlayers.isEmpty())
+                    return;
+
+                if (ticksUntilNextDrop <= 0) {
+                    processSupplyDrop();
+
+                    // 다음 투하 시간 계산 (1인: 10초, 2인: 5초, 3인 이상: 3초)
+                    int playerCount = survivalPlayers.size();
+                    if (playerCount <= 1) {
+                        ticksUntilNextDrop = 200; // 10초
+                    } else if (playerCount == 2) {
+                        ticksUntilNextDrop = 100; // 5초
+                    } else {
+                        ticksUntilNextDrop = 60; // 3초
+                    }
+                }
+
+                ticksUntilNextDrop -= 20; // 1초(20틱) 주기
             }
-        }.runTaskTimer(plugin, 40L, DROP_INTERVAL);
+        }.runTaskTimer(plugin, 40L, 20L);
     }
 
     /**
@@ -74,14 +96,36 @@ public class SupplyDropManager {
 
         WorldBorder border = world.getWorldBorder();
         Random random = new Random();
-        double size = border.getSize() / 2;
+        double borderSize = border.getSize() / 2;
         Location center = border.getCenter();
 
-        // 자기장 내의 무작위 좌표 (중심점 기준)
-        double x = center.getX() + (random.nextDouble() * size * 2) - size;
-        double z = center.getZ() + (random.nextDouble() * size * 2) - size;
+        double x, z;
+        List<Player> players = Bukkit.getOnlinePlayers().stream()
+                .filter(p -> p.getGameMode() == GameMode.SURVIVAL)
+                .collect(Collectors.toList());
 
-        // 청크 로드 확인 및 처리
+        // 70% 확률로 유저 근처에, 30% 확률로 완전 랜덤하게 투하
+        if (!players.isEmpty() && random.nextDouble() < 0.7) {
+            Player target = players.get(random.nextInt(players.size()));
+            Location pLoc = target.getLocation();
+
+            // 유저 기준 50~150블럭 사이의 무작위 위치
+            double angle = random.nextDouble() * 2 * Math.PI;
+            double radius = 50 + (random.nextDouble() * 100);
+
+            x = pLoc.getX() + (Math.cos(angle) * radius);
+            z = pLoc.getZ() + (Math.sin(angle) * radius);
+
+            // 보더 밖으로 나가지 않도록 보정
+            x = Math.max(center.getX() - borderSize, Math.min(center.getX() + borderSize, x));
+            z = Math.max(center.getZ() - borderSize, Math.min(center.getZ() + borderSize, z));
+        } else {
+            // 자기장 내의 완전 무작위 좌표
+            x = center.getX() + (random.nextDouble() * borderSize * 2) - borderSize;
+            z = center.getZ() + (random.nextDouble() * borderSize * 2) - borderSize;
+        }
+
+        // 청크 로드 확인 및 처리 (가상화되어 있으므로 로드할 필요는 없지만 위치 탐색용)
         int chunkX = (int) x >> 4;
         int chunkZ = (int) z >> 4;
 
@@ -92,9 +136,66 @@ public class SupplyDropManager {
         // 보급품 투하 위치 탐색
         Location loc = findGroundLocationAt(world, x, z);
         if (loc != null) {
-            dropSupplyCrateAt(loc);
+            // 즉시 설치 대신 가상 위치로 등록
+            Location blockLoc = loc.getBlock().getLocation();
+            String key = locToKey(blockLoc);
+            pendingSupplyLocations.add(key);
+            locationMap.put(key, blockLoc);
             totalDrops++;
             updateSupplyBossBar();
+
+            // 만약 해당 지역이 이미 로드되어 있다면 즉시 설치 시도
+            if (world.isChunkLoaded(blockLoc.getBlockX() >> 4, blockLoc.getBlockZ() >> 4)) {
+                checkAndRealizePendingDrop(blockLoc);
+            }
+        }
+    }
+
+    /**
+     * 가상 보급품을 실제 블록으로 설치 (지연 설치)
+     */
+    public void checkAndRealizePendingDrop(Location loc) {
+        String key = locToKey(loc);
+        if (!pendingSupplyLocations.contains(key) || supplyCrateLocations.contains(key)) {
+            return;
+        }
+
+        // 실제 설치
+        loc.getBlock().setType(Material.CHEST);
+        org.bukkit.block.Chest chest = (org.bukkit.block.Chest) loc.getBlock().getState();
+
+        // 루팅 생성 (이때 계산)
+        lootGenerator.generateLoot(chest.getInventory());
+
+        // 추적 리스트 이동
+        pendingSupplyLocations.remove(key);
+        supplyCrateLocations.add(key);
+    }
+
+    private String locToKey(Location loc) {
+        return loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ();
+    }
+
+    /**
+     * 청크 내의 모든 대기 중인 보급품 설치
+     */
+    public void realizePendingDropsInChunk(Chunk chunk) {
+        if (pendingSupplyLocations.isEmpty())
+            return;
+
+        List<String> toRealizeKeys = new ArrayList<>();
+        for (String key : pendingSupplyLocations) {
+            Location loc = locationMap.get(key);
+            if (loc != null && loc.getBlockX() >> 4 == chunk.getX() && loc.getBlockZ() >> 4 == chunk.getZ()) {
+                toRealizeKeys.add(key);
+            }
+        }
+
+        for (String key : toRealizeKeys) {
+            Location loc = locationMap.get(key);
+            if (loc != null) {
+                checkAndRealizePendingDrop(loc);
+            }
         }
     }
 
@@ -128,7 +229,9 @@ public class SupplyDropManager {
 
         // 보급품 위치 추적
         Location blockLoc = dropLocation.getBlock().getLocation();
-        supplyCrateLocations.add(blockLoc);
+        String key = locToKey(blockLoc);
+        supplyCrateLocations.add(key);
+        locationMap.put(key, blockLoc);
     }
 
     /**
@@ -203,45 +306,62 @@ public class SupplyDropManager {
 
         supplyCrateLocations.clear();
         openedSupplyCrates.clear();
+        pendingSupplyLocations.clear();
     }
 
     /**
      * 보급 상자가 열렸음을 기록
      */
     public void markSupplyOpened(Location location) {
-        Location blockLoc = location.getBlock().getLocation();
-        if (supplyCrateLocations.contains(blockLoc)) {
-            openedSupplyCrates.add(blockLoc);
-            // supplyCrateLocations.remove(blockLoc); // cleanupDestroyedCrates에서 처리하도록 둠
+        String key = locToKey(location);
+        if (supplyCrateLocations.contains(key) || pendingSupplyLocations.contains(key)) {
+            openedSupplyCrates.add(key);
+            // 나침반에서 더 이상 나오지 않게 함
         }
+    }
+
+    /**
+     * 보급 상자가 파괴되었을 때 처리
+     */
+    public void markSupplyBroken(Location location) {
+        String key = locToKey(location);
+        supplyCrateLocations.remove(key);
+        pendingSupplyLocations.remove(key);
+        openedSupplyCrates.add(key); // 아예 제외되도록 열린 상자 목록에 추가
     }
 
     /**
      * 특정 위치가 보급 상자인지 확인
      */
     public boolean isSupplyCrate(Location location) {
-        return supplyCrateLocations.contains(location.getBlock().getLocation());
+        String key = locToKey(location);
+        return supplyCrateLocations.contains(key) || pendingSupplyLocations.contains(key);
     }
 
     /**
      * 플레이어에게 가장 가까운 열리지 않은 보급품 위치 반환
      */
-    public Location getNearestUnopenedSupply(Player player) {
-        Location playerLoc = player.getLocation();
+    public Location getNearestUnopenedSupply(Location playerLoc) {
         Location nearest = null;
         double nearestDist = Double.MAX_VALUE;
 
-        // 월드보더 정보 가져오기
         World world = playerLoc.getWorld();
         WorldBorder border = world.getWorldBorder();
         Location borderCenter = border.getCenter();
-        double borderRadius = border.getSize() / 2.0;
 
-        for (Location loc : supplyCrateLocations) {
+        // 모든 보급 위치 (설치된 것 + 대기 중인 것)
+        List<String> allKeys = new ArrayList<>(supplyCrateLocations);
+        allKeys.addAll(pendingSupplyLocations);
+
+        for (String key : allKeys) {
             // 이미 열린/파괴된 보급품은 제외
-            if (openedSupplyCrates.contains(loc)) {
+            if (openedSupplyCrates.contains(key)) {
                 continue;
             }
+
+            Location loc = locationMap.get(key);
+            if (loc == null)
+                continue;
 
             // 같은 월드인지 확인
             if (!loc.getWorld().equals(playerLoc.getWorld())) {
@@ -249,21 +369,22 @@ public class SupplyDropManager {
             }
 
             // 월드보더 밖의 보급품은 제외
+            double borderRadius = border.getSize() / 2.0;
             double dx = loc.getX() - borderCenter.getX();
             double dz = loc.getZ() - borderCenter.getZ();
-            double distFromCenter = Math.sqrt(dx * dx + dz * dz);
+            double distFromCenterSq = dx * dx + dz * dz;
 
-            if (distFromCenter > borderRadius) {
+            if (distFromCenterSq > borderRadius * borderRadius) {
                 continue; // 월드보더 밖
             }
 
             // 플레이어와의 거리 계산 (X, Z만 고려, Y는 무시)
-            dx = loc.getX() - playerLoc.getX();
-            dz = loc.getZ() - playerLoc.getZ();
-            double dist = dx * dx + dz * dz; // distanceSquared와 동일하지만 Y 제외
+            double pdx = loc.getX() - playerLoc.getX();
+            double pdz = loc.getZ() - playerLoc.getZ();
+            double distSq = pdx * pdx + pdz * pdz;
 
-            if (dist < nearestDist) {
-                nearestDist = dist;
+            if (distSq < nearestDist) {
+                nearestDist = distSq;
                 nearest = loc;
             }
         }
@@ -306,7 +427,7 @@ public class SupplyDropManager {
                         continue;
                     }
 
-                    Location nearest = getNearestUnopenedSupply(player);
+                    Location nearest = getNearestUnopenedSupply(player.getLocation());
                     if (nearest != null) {
                         player.setCompassTarget(nearest);
                     } else {
@@ -321,20 +442,22 @@ public class SupplyDropManager {
     /**
      * 파괴된 상자들을 정리
      */
-    private void cleanupDestroyedCrates() {
-        if (supplyCrateLocations.isEmpty())
-            return;
-
-        Iterator<Location> iterator = supplyCrateLocations.iterator();
-        while (iterator.hasNext()) {
-            Location loc = iterator.next();
-            if (loc.getWorld() == null)
+    public void cleanupDestroyedCrates() {
+        Iterator<String> it = supplyCrateLocations.iterator();
+        while (it.hasNext()) {
+            String key = it.next();
+            Location loc = locationMap.get(key);
+            if (loc == null) { // Location might be null if it was never added to locationMap or removed
+                it.remove();
+                openedSupplyCrates.add(key);
                 continue;
+            }
 
             // 이미 열린 것으로 표시된 경우 목록에서 제거
-            if (openedSupplyCrates.contains(loc)) {
-                iterator.remove();
-                openedSupplyCrates.remove(loc); // 메모리 관리: 추적 목록에서도 제거
+            if (openedSupplyCrates.contains(key)) {
+                it.remove();
+                // openedSupplyCrates.remove(key); // Keep it in openedSupplyCrates to prevent
+                // re-adding
                 continue;
             }
 
@@ -345,7 +468,8 @@ public class SupplyDropManager {
             if (loc.getWorld().isChunkLoaded(chunkX, chunkZ)) {
                 Material type = loc.getBlock().getType();
                 if (type != Material.CHEST) {
-                    iterator.remove();
+                    it.remove();
+                    openedSupplyCrates.add(key);
                 }
             }
         }

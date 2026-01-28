@@ -12,7 +12,6 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.attribute.Attribute;
-import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -48,6 +47,9 @@ public class GameManager {
     // 데스타임
     private boolean isDeathTime;
     private long deathTimeStartTime;
+    private boolean isSelectingBounty = false; // 현상금 선정 중인지 확인용 플래그
+    private boolean revealed60 = false; // 60초 좌표 공개 여부
+    private boolean revealed10 = false; // 10초 좌표 공개 여부
     private static final long DEATH_TIME_DURATION = 5 * 60 * 1000; // 5분
 
     // 리스폰 설정
@@ -299,50 +301,60 @@ public class GameManager {
         World world = Bukkit.getWorlds().get(0);
         WorldBorder border = world.getWorldBorder();
 
-        // 중심을 (0, 0)으로 먼저 설정
+        // 자기장 초기 설정 (1000x1000 고정)
         border.setCenter(0, 0);
+        border.setSize(1000);
 
-        // 초기 크기 설정 (config에서 읽기)
-        double initialSize = plugin.getConfigManager().getWorldBorderInitialSize();
-        border.setSize(initialSize);
+        broadcast("§e§l[배틀로얄 2.0] §f월드보더가 1000x1000으로 고정되었습니다.");
 
-        broadcast("§e[배틀로얄 2.0] 월드보더가 설정되었습니다: §f" + (int) initialSize + "x" + (int) initialSize);
-
-        // config에서 수축 설정 읽기
-        long shrinkInterval = plugin.getConfigManager().getWorldBorderShrinkInterval() * 20L; // 초를 틱으로 변환
-        List<Integer> shrinkStages = plugin.getConfigManager().getWorldBorderShrinkStages();
-
-        // 단계별 축소 스케줄
-        worldBorderTask = new BukkitRunnable() {
-            int currentStageIndex = 0;
-
-            @Override
-            public void run() {
-                if (currentStageIndex >= shrinkStages.size() - 1) {
-                    // 마지막 단계 (0)에 도달하면 게임 종료
-                    cancel();
-                    broadcast("§c§l[배틀로얄 2.0] §e자기장이 완전히 축소되었습니다! 게임 종료!");
-                    endGame();
-                    return;
-                }
-
-                currentStageIndex++;
-                double currentSize = border.getSize();
-                double newSize = shrinkStages.get(currentStageIndex);
-
-                // 축소할 거리 계산 (반지름 기준)
-                double shrinkDistance = (currentSize - newSize) / 2;
-
-                // 초당 1.7블럭 속도로 축소 시간 계산
-                long shrinkDuration = (long) (shrinkDistance / 1.7);
-
-                // 액션바 매니저에 축소 시작 알림
-                worldBorderActionBarManager.notifyShrinkStart(currentSize, newSize, shrinkDuration);
-
-                // 설정된 시간에 걸쳐 천천히 축소
-                border.setSize(newSize, shrinkDuration);
-            }
-        }.runTaskTimer(plugin, shrinkInterval, shrinkInterval);
+        // 자기장 축소 태스크는 제거 (사용자가 1000 고정 요청)
+        /*
+         * // config에서 수축 설정 읽기
+         * long shrinkInterval =
+         * plugin.getConfigManager().getWorldBorderShrinkInterval() * 20L; // 초를 틱으로 변환
+         * List<Integer> shrinkStages =
+         * plugin.getConfigManager().getWorldBorderShrinkStages();
+         * 
+         * // 단계별 축소 스케줄
+         * worldBorderTask = new BukkitRunnable() {
+         * int currentStageIndex = 0;
+         * 
+         * @Override
+         * public void run() {
+         * if (currentStageIndex >= shrinkStages.size() - 1) {
+         * // 마지막 단계 도달
+         * cancel();
+         * double finalSize = shrinkStages.get(currentStageIndex);
+         * 
+         * if (finalSize <= 0) {
+         * broadcast("§c§l[배틀로얄 2.0] §e자기장이 완전히 축소되었습니다! 게임 종료!");
+         * endGame();
+         * } else {
+         * broadcast("§e§l[배틀로얄 2.0] §f자기장 축소가 완료되었습니다. (현재 크기: " + (int) finalSize +
+         * ")");
+         * }
+         * return;
+         * }
+         * 
+         * currentStageIndex++;
+         * double currentSize = border.getSize();
+         * double newSize = shrinkStages.get(currentStageIndex);
+         * 
+         * // 축소할 거리 계산 (반지름 기준)
+         * double shrinkDistance = (currentSize - newSize) / 2;
+         * 
+         * // 초당 1.7블럭 속도로 축소 시간 계산
+         * long shrinkDuration = (long) (shrinkDistance / 1.7);
+         * 
+         * // 액션바 매니저에 축소 시작 알림
+         * worldBorderActionBarManager.notifyShrinkStart(currentSize, newSize,
+         * shrinkDuration);
+         * 
+         * // 설정된 시간에 걸쳐 천천히 축소
+         * border.setSize(newSize, shrinkDuration);
+         * }
+         * }.runTaskTimer(plugin, shrinkInterval, shrinkInterval);
+         */
     }
 
     /**
@@ -409,6 +421,10 @@ public class GameManager {
      * 새로운 현상금 대상 선정 (슬롯머신 연출)
      */
     private void selectNewBountyTarget() {
+        if (isSelectingBounty)
+            return; // 이미 선정 중이면 중복 실행 방지
+        isSelectingBounty = true;
+
         // 이전 현상금 해제
         if (currentBountyTarget != null) {
             PlayerData oldData = playerDataMap.get(currentBountyTarget);
@@ -423,8 +439,14 @@ public class GameManager {
                 .collect(Collectors.toList());
 
         if (alivePlayers.isEmpty()) {
+            isSelectingBounty = false;
             return;
         }
+
+        // 현상금 시작 시간 즉시 초기화하여 중복 호출 방지
+        bountyStartTime = System.currentTimeMillis();
+        revealed60 = false;
+        revealed10 = false;
 
         // 슬롯머신 연출
         new BukkitRunnable() {
@@ -438,6 +460,7 @@ public class GameManager {
                     UUID selected = alivePlayers.get(new Random().nextInt(alivePlayers.size()));
                     currentBountyTarget = selected;
                     bountyStartTime = System.currentTimeMillis();
+                    isSelectingBounty = false; // 선정 완료
 
                     PlayerData data = playerDataMap.get(selected);
                     if (data != null) {
@@ -446,9 +469,9 @@ public class GameManager {
 
                     Player target = Bukkit.getPlayer(selected);
                     if (target != null) {
-                        // 최종 타이틀 표시 (Legacy 방식)
+                        // 최종 타이틀은 제거하고 소리만 재생 (요청하신 대로 채팅창에만 출력)
                         for (Player p : Bukkit.getOnlinePlayers()) {
-                            p.sendTitle("§c§l[ 현상금 ]", "§e" + target.getName(), 10, 40, 10);
+                            // p.sendTitle("§c§l[ 현상금 ]", "§e" + target.getName(), 10, 40, 10); // 제거
                             p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                         }
 
@@ -460,12 +483,13 @@ public class GameManager {
                     return;
                 }
 
-                // 슬롯머신 효과 (Legacy 방식)
+                // 슬롯머신 효과 (Legacy 방식 - 타이틀에서 돌아감)
                 UUID randomPlayer = alivePlayers.get(new Random().nextInt(alivePlayers.size()));
                 Player targetPlayer = Bukkit.getPlayer(randomPlayer);
                 if (targetPlayer != null) {
                     for (Player online : Bukkit.getOnlinePlayers()) {
-                        online.sendTitle("§c§l[ 현상금 ]", "§f" + targetPlayer.getName(), 0, 5, 0);
+                        online.sendTitle("§c§l[ 현상금 선정 중... ]", "§f" + targetPlayer.getName(), 0, 5, 0);
+                        online.playSound(online.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.5f, 1.5f);
                     }
                 }
 
@@ -512,13 +536,26 @@ public class GameManager {
         }
 
         long elapsed = System.currentTimeMillis() - bountyStartTime;
-        double progress = 1.0 - ((double) elapsed / BOUNTY_DURATION);
+        long remainingMills = BOUNTY_DURATION - elapsed;
+        double progress = (double) remainingMills / BOUNTY_DURATION;
         progress = Math.max(0.0, Math.min(1.0, progress));
 
         bountyBossBar.setProgress(progress);
 
-        long remainingSeconds = (BOUNTY_DURATION - elapsed) / 1000;
-        bountyBossBar.setTitle("§c§l현상금: §e" + target.getName() + " §f(" + remainingSeconds + "초 남음)");
+        long remainingSeconds = remainingMills / 1000;
+
+        // 좌표 공개 로직 (60초, 10초 남았을 때)
+        if (remainingSeconds == 60 && !revealed60) {
+            Location loc = target.getLocation();
+            broadcast("§c§l[현상금 알림] §e사냥 종료 60초 전! §f대상 좌표: §aX:" + loc.getBlockX() + " Z:" + loc.getBlockZ());
+            revealed60 = true;
+        } else if (remainingSeconds == 10 && !revealed10) {
+            Location loc = target.getLocation();
+            broadcast("§c§l[현상금 알림] §e사냥 종료 10초 전! §f대상 좌표: §aX:" + loc.getBlockX() + " Z:" + loc.getBlockZ());
+            revealed10 = true;
+        }
+
+        bountyBossBar.setTitle("§c§l현상금: §e" + target.getName() + " §f(" + Math.max(0, remainingSeconds) + "초 남음)");
     }
 
     /**

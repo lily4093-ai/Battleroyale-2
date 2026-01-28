@@ -19,10 +19,13 @@ public class SupplyDropListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        // 보급품 상자는 파괴 가능하도록 허용
-        // 추가 로직이 필요하면 여기에 구현
+        Block block = event.getBlock();
+        // 보급품 상자가 파괴되면 추적 목록에서 제외
+        if (plugin.getSupplyDropManager().isSupplyCrate(block.getLocation())) {
+            plugin.getSupplyDropManager().markSupplyBroken(block.getLocation());
+        }
     }
 
     @EventHandler

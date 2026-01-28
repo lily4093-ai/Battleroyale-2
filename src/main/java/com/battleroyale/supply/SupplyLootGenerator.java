@@ -17,6 +17,10 @@ public class SupplyLootGenerator {
     private final Random random = new Random();
     private final ConfigManager config;
 
+    // 최근 드롭된 총기 이력 추적 (중복 방지용)
+    private final List<String> gunHistory = new LinkedList<>();
+    private static final int HISTORY_SIZE = 12; // 최근 12개까지 기억 (중복 방지)
+
     public SupplyLootGenerator(BattleRoyalePlugin plugin) {
         this.config = plugin.getConfigManager();
     }
@@ -29,21 +33,19 @@ public class SupplyLootGenerator {
 
         String selectedGunAmmo = null;
 
-        // 1. 총기 (config에서 확률 읽기)
-        if (random.nextDouble() < config.getSupplyGunChance()) {
-            GunData gun = selectRandomGun();
-            if (gun != null) {
-                inventory.setItem(getRandomSlot(inventory), gun.itemStack);
-                selectedGunAmmo = gun.ammoType;
+        // 1. 총기 (100% 확률로 항상 1개 포함)
+        GunData gun = selectRandomGun();
+        if (gun != null) {
+            inventory.setItem(getRandomSlot(inventory), gun.itemStack);
+            selectedGunAmmo = gun.ammoType;
 
-                // 미니건일 경우 .308 탄약 4세트(풀 스택) 확정 추가
-                if ("tacz:minigun".equals(gun.gunId)) {
-                    for (int i = 0; i < 4; i++) {
-                        ItemStack ammo = com.battleroyale.util.TaczItemUtil.createAmmo("tacz:308", 48);
-                        int slot = getRandomSlot(inventory);
-                        if (slot != -1) {
-                            inventory.setItem(slot, ammo);
-                        }
+            // 미니건일 경우 .308 탄약 4세트 확정 (특수 케이스)
+            if ("tacz:minigun".equals(gun.gunId)) {
+                for (int i = 0; i < 4; i++) {
+                    ItemStack ammo = com.battleroyale.util.TaczItemUtil.createAmmo("tacz:308", 48);
+                    int slot = getRandomSlot(inventory);
+                    if (slot != -1) {
+                        inventory.setItem(slot, ammo);
                     }
                 }
             }
@@ -97,12 +99,22 @@ public class SupplyLootGenerator {
             inventory.setItem(getRandomSlot(inventory), new ItemStack(Material.COBBLESTONE, cobblestoneAmount));
         }
 
-        // 6. 탄약 생성 로직 개편
+        // 5.5. 탄약 상자 (10% 확률로 레벨 0, 1, 2 한 세트 등장)
+        if (random.nextDouble() < 0.10) {
+            for (int level = 0; level <= 2; level++) {
+                int slot = getRandomSlot(inventory);
+                if (slot != -1) {
+                    inventory.setItem(slot, com.battleroyale.util.TaczItemUtil.createAmmoBox(level));
+                }
+            }
+        }
+
+        // 6. 탄약 생성 로직 (기존 요청대로 복구: 칸당 확률)
         // 총이 있으면 해당 총알이 8.5% 확률로, 없으면 무작위 총알이 4% 확률로 생성
-        double ammoChance = (selectedGunAmmo != null) ? 0.085 : 0.04;
+        double ammoChancePerSlot = (selectedGunAmmo != null) ? 0.085 : 0.04;
 
         for (int i = 0; i < 27; i++) {
-            if (inventory.getItem(i) == null && random.nextDouble() < ammoChance) {
+            if (inventory.getItem(i) == null && random.nextDouble() < ammoChancePerSlot) {
                 ItemStack ammo = getRandomAmmo(selectedGunAmmo);
                 if (ammo != null) {
                     inventory.setItem(i, ammo);
@@ -140,19 +152,38 @@ public class SupplyLootGenerator {
         int legendaryWeight = config.getGunTierLegendary();
         int totalWeight = commonWeight + uncommonWeight + rareWeight + epicWeight + legendaryWeight;
 
-        int roll = random.nextInt(totalWeight);
+        GunData selected = null;
+        int maxAttempts = 5; // 중복이 아닌 총을 찾기 위한 최대 시도 횟수
 
-        if (roll < legendaryWeight) {
-            return getRandomLegendaryGun();
-        } else if (roll < legendaryWeight + epicWeight) {
-            return getRandomEpicGun();
-        } else if (roll < legendaryWeight + epicWeight + rareWeight) {
-            return getRandomRareGun();
-        } else if (roll < legendaryWeight + epicWeight + rareWeight + uncommonWeight) {
-            return getRandomUncommonGun();
-        } else {
-            return getRandomCommonGun();
+        for (int i = 0; i < maxAttempts; i++) {
+            int roll = random.nextInt(totalWeight);
+            if (roll < legendaryWeight) {
+                selected = getRandomLegendaryGun();
+            } else if (roll < legendaryWeight + epicWeight) {
+                selected = getRandomEpicGun();
+            } else if (roll < legendaryWeight + epicWeight + rareWeight) {
+                selected = getRandomRareGun();
+            } else if (roll < legendaryWeight + epicWeight + rareWeight + uncommonWeight) {
+                selected = getRandomUncommonGun();
+            } else {
+                selected = getRandomCommonGun();
+            }
+
+            // 최근에 드롭된 적이 없는 총기면 루프 종료
+            if (selected != null && !gunHistory.contains(selected.gunId)) {
+                break;
+            }
         }
+
+        // 이력 업데이트
+        if (selected != null) {
+            gunHistory.add(selected.gunId);
+            if (gunHistory.size() > HISTORY_SIZE) {
+                gunHistory.remove(0);
+            }
+        }
+
+        return selected;
     }
 
     /**
