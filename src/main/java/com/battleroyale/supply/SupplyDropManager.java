@@ -83,7 +83,7 @@ public class SupplyDropManager {
     }
 
     /**
-     * 보급품 투하 처리 (Arclight 호환)
+     * 보급품 투하 처리 (비동기 청크 로드로 렉 방지)
      */
     private void scheduleAsyncDrop() {
         World world = Bukkit.getWorlds().get(0);
@@ -94,22 +94,40 @@ public class SupplyDropManager {
         double x = (random.nextDouble() * size * 2) - size;
         double z = (random.nextDouble() * size * 2) - size;
 
-        // 청크 로드 (동기 방식 - Arclight 호환)
+        // 청크 비동기 로드 (렉 방지)
         int chunkX = (int) x >> 4;
         int chunkZ = (int) z >> 4;
+
         if (!world.isChunkLoaded(chunkX, chunkZ)) {
-            world.loadChunk(chunkX, chunkZ);
-        }
+            // 비동기로 청크 로드 후 보급품 투하
+            world.getChunkAtAsync(chunkX, chunkZ).thenAccept(chunk -> {
+                Location loc = findGroundLocationAt(world, x, z);
+                if (loc != null) {
+                    // 메인 스레드에서 블록 설정
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        dropSupplyCrateAt(loc);
+                        completedDropsThisRound++;
+                        updateSupplyBossBar();
 
-        Location loc = findGroundLocationAt(world, x, z);
-        if (loc != null) {
-            dropSupplyCrateAt(loc);
-            completedDropsThisRound++;
-            updateSupplyBossBar();
+                        // 모든 투하가 완료되었는지 체크
+                        if (completedDropsThisRound >= DROPS_PER_ROUND) {
+                            finishSupplyDrop(1);
+                        }
+                    });
+                }
+            });
+        } else {
+            // 이미 로드된 청크는 즉시 처리
+            Location loc = findGroundLocationAt(world, x, z);
+            if (loc != null) {
+                dropSupplyCrateAt(loc);
+                completedDropsThisRound++;
+                updateSupplyBossBar();
 
-            // 모든 투하가 완료되었는지 체크
-            if (completedDropsThisRound >= DROPS_PER_ROUND) {
-                finishSupplyDrop(1);
+                // 모든 투하가 완료되었는지 체크
+                if (completedDropsThisRound >= DROPS_PER_ROUND) {
+                    finishSupplyDrop(1);
+                }
             }
         }
     }
@@ -145,12 +163,6 @@ public class SupplyDropManager {
         // 보급품 위치 추적
         Location blockLoc = dropLocation.getBlock().getLocation();
         supplyCrateLocations.add(blockLoc);
-
-        // 파티클 효과
-        dropLocation.getWorld().spawnParticle(
-                Particle.FLAME,
-                dropLocation.clone().add(0.5, 1, 0.5),
-                50, 0.5, 0.5, 0.5, 0.1);
 
         dropCount++;
     }
