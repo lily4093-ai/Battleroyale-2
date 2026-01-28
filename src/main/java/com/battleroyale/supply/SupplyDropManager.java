@@ -64,26 +64,35 @@ public class SupplyDropManager {
                         .filter(p -> p.getGameMode() == GameMode.SURVIVAL)
                         .collect(Collectors.toList());
 
-                if (survivalPlayers.isEmpty())
+                if (survivalPlayers.isEmpty()) {
+                    // Bukkit.getLogger().info("[BattleRoyale] 생존 플레이어가 없어 보급 투하를 대기합니다.");
                     return;
+                }
 
                 if (ticksUntilNextDrop <= 0) {
-                    processSupplyDrop();
+                    try {
+                        Bukkit.getLogger().info("[BattleRoyale] 보급 투하 시도... (현재 누적: " + totalDrops + ", 플레이어 수: "
+                                + survivalPlayers.size() + ")");
+                        processSupplyDrop();
+                    } catch (Exception e) {
+                        Bukkit.getLogger().severe("[BattleRoyale] 보급 투하 중 오류 발생: " + e.getMessage());
+                        e.printStackTrace();
+                    }
 
                     // 다음 투하 시간 계산 (1인: 10초, 2인: 5초, 3인 이상: 3초)
                     int playerCount = survivalPlayers.size();
                     if (playerCount <= 1) {
-                        ticksUntilNextDrop = 200; // 10초
+                        ticksUntilNextDrop = 10; // 10초
                     } else if (playerCount == 2) {
-                        ticksUntilNextDrop = 100; // 5초
+                        ticksUntilNextDrop = 5; // 5초
                     } else {
-                        ticksUntilNextDrop = 60; // 3초
+                        ticksUntilNextDrop = 3; // 3초
                     }
+                } else {
+                    ticksUntilNextDrop--;
                 }
-
-                ticksUntilNextDrop -= 20; // 1초(20틱) 주기
             }
-        }.runTaskTimer(plugin, 40L, 20L);
+        }.runTaskTimer(plugin, 40L, 20L); // 1초(20틱) 주기
     }
 
     /**
@@ -148,6 +157,10 @@ public class SupplyDropManager {
             if (world.isChunkLoaded(blockLoc.getBlockX() >> 4, blockLoc.getBlockZ() >> 4)) {
                 checkAndRealizePendingDrop(blockLoc);
             }
+
+            Bukkit.getLogger().info("[BattleRoyale] 보급 투하 예약 완료: " + key + " (누적: " + totalDrops + ")");
+        } else {
+            Bukkit.getLogger().warning("[BattleRoyale] 보급 투하 위치를 찾지 못했습니다 (x=" + x + ", z=" + z + ")");
         }
     }
 
@@ -173,7 +186,10 @@ public class SupplyDropManager {
     }
 
     private String locToKey(Location loc) {
-        return loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ();
+        if (loc == null || loc.getWorld() == null)
+            return "unknown";
+        return loc.getWorld().getName().toLowerCase() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":"
+                + loc.getBlockZ();
     }
 
     /**
@@ -363,18 +379,28 @@ public class SupplyDropManager {
             if (loc == null)
                 continue;
 
-            // 같은 월드인지 확인
-            if (!loc.getWorld().equals(playerLoc.getWorld())) {
+            // 실시간 상태 확인: 만약 블록이 로드된 상태인데 상자가 아니라면 이미 파괴/열린 것임 (대기 중인 보급품 제외)
+            if (loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
+                Material type = loc.getBlock().getType();
+                if (type != Material.CHEST && type != Material.TRAPPED_CHEST && !pendingSupplyLocations.contains(key)) {
+                    // 즉시 정리
+                    openedSupplyCrates.add(key);
+                    supplyCrateLocations.remove(key);
+                    continue;
+                }
+            }
+
+            // 같은 월드인지 확인 (대기 중인 보급품도 위치 데이터는 있으므로 체크 가능)
+            if (!loc.getWorld().getName().equalsIgnoreCase(playerLoc.getWorld().getName())) {
                 continue;
             }
 
-            // 월드보더 밖의 보급품은 제외
+            // 월드보더 밖의 보급품은 제외 (정사각형 보더 체크)
             double borderRadius = border.getSize() / 2.0;
             double dx = loc.getX() - borderCenter.getX();
             double dz = loc.getZ() - borderCenter.getZ();
-            double distFromCenterSq = dx * dx + dz * dz;
 
-            if (distFromCenterSq > borderRadius * borderRadius) {
+            if (Math.abs(dx) > borderRadius || Math.abs(dz) > borderRadius) {
                 continue; // 월드보더 밖
             }
 
@@ -401,22 +427,18 @@ public class SupplyDropManager {
         }
 
         compassTask = new BukkitRunnable() {
-            private int cleanupCounter = 0;
-
             @Override
             public void run() {
-                // 파괴된 상자 정리 - 매 100틱(5초)마다만 수행하여 부하 감소
-                cleanupCounter++;
-                if (cleanupCounter >= 20) { // 5틱 * 20 = 100틱
-                    cleanupDestroyedCrates();
-                    cleanupCounter = 0;
-                }
+                // 모든 보급 위치 (설치된 것 + 대기 중인 것)
+                List<String> allKeys = new ArrayList<>(supplyCrateLocations);
+                allKeys.addAll(pendingSupplyLocations);
 
-                if (supplyCrateLocations.isEmpty()) {
-                    // 모든 보급 상자가 사라진 경우 나침반 초기화
+                if (allKeys.isEmpty()) {
+                    // 모든 보급 상자가 없는 경우 나침반 초기화
                     for (Player player : Bukkit.getOnlinePlayers()) {
                         if (player.getGameMode() == GameMode.SURVIVAL) {
                             player.setCompassTarget(player.getWorld().getSpawnLocation());
+                            Bukkit.getLogger().info("[BattleRoyale] " + player.getName() + "의 나침반 목표: 스폰 지점 (보급품 없음)");
                         }
                     }
                     return;
@@ -430,9 +452,11 @@ public class SupplyDropManager {
                     Location nearest = getNearestUnopenedSupply(player.getLocation());
                     if (nearest != null) {
                         player.setCompassTarget(nearest);
+                        Bukkit.getLogger().info(
+                                "[BattleRoyale] " + player.getName() + "의 나침반 목표: 보급품 (" + locToKey(nearest) + ")");
                     } else {
-                        // 더 이상 열지 않은 보급품이 없으면 스폰 지점으로 초기화
                         player.setCompassTarget(player.getWorld().getSpawnLocation());
+                        Bukkit.getLogger().info("[BattleRoyale] " + player.getName() + "의 나침반 목표: 스폰 지점 (보급품 없음)");
                     }
                 }
             }

@@ -2,6 +2,7 @@ package com.battleroyale.supply;
 
 import com.battleroyale.BattleRoyalePlugin;
 import com.battleroyale.config.ConfigManager;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -29,97 +30,102 @@ public class SupplyLootGenerator {
      * 보급 상자에 루팅 생성
      */
     public void generateLoot(Inventory inventory) {
-        inventory.clear();
+        try {
+            inventory.clear();
 
-        String selectedGunAmmo = null;
+            String selectedGunAmmo = null;
 
-        // 1. 총기 (100% 확률로 항상 1개 포함)
-        GunData gun = selectRandomGun();
-        if (gun != null) {
-            inventory.setItem(getRandomSlot(inventory), gun.itemStack);
-            selectedGunAmmo = gun.ammoType;
+            // 1. 총기 (100% 확률로 항상 1개 포함)
+            GunData gun = selectRandomGun();
+            if (gun != null) {
+                inventory.setItem(getRandomSlot(inventory), gun.itemStack);
+                selectedGunAmmo = gun.ammoType;
 
-            // 미니건일 경우 .308 탄약 4세트 확정 (특수 케이스)
-            if ("tacz:minigun".equals(gun.gunId)) {
-                for (int i = 0; i < 4; i++) {
-                    ItemStack ammo = com.battleroyale.util.TaczItemUtil.createAmmo("tacz:308", 48);
-                    int slot = getRandomSlot(inventory);
-                    if (slot != -1) {
-                        inventory.setItem(slot, ammo);
+                // 미니건일 경우 .308 탄약 4세트 확정 (특수 케이스)
+                if ("tacz:minigun".equals(gun.gunId)) {
+                    for (int i = 0; i < 4; i++) {
+                        ItemStack ammo = com.battleroyale.util.TaczItemUtil.createAmmo("tacz:308", 48);
+                        int slot = getRandomSlot(inventory);
+                        if (slot != -1) {
+                            inventory.setItem(slot, ammo);
+                        }
                     }
                 }
             }
-        }
 
-        // 2. 부착물 (config에서 확률 및 최대값 읽기)
-        int attachmentCount = 0;
-        int maxAttachments = config.getSupplyAttachmentMax();
-        double attachmentChance = config.getSupplyAttachmentChance();
-        for (int i = 0; i < 27 && attachmentCount < maxAttachments; i++) {
-            if (random.nextDouble() < attachmentChance) {
-                ItemStack attachment = getRandomAttachment();
-                if (attachment != null) {
-                    inventory.setItem(getRandomSlot(inventory), attachment);
-                    attachmentCount++;
+            // 2. 부착물 (config에서 확률 및 최대값 읽기)
+            int attachmentCount = 0;
+            int maxAttachments = config.getSupplyAttachmentMax();
+            double attachmentChance = config.getSupplyAttachmentChance();
+            for (int i = 0; i < 27 && attachmentCount < maxAttachments; i++) {
+                if (random.nextDouble() < attachmentChance) {
+                    ItemStack attachment = getRandomAttachment();
+                    if (attachment != null) {
+                        inventory.setItem(getRandomSlot(inventory), attachment);
+                        attachmentCount++;
+                    }
                 }
             }
-        }
 
-        // 3. 음식 (config에서 확률 및 최대값 읽기)
-        int foodCount = 0;
-        int maxFood = config.getSupplyFoodMax();
-        double foodChance = config.getSupplyFoodChance();
-        for (int i = 0; i < 27 && foodCount < maxFood; i++) {
-            if (random.nextDouble() < foodChance) {
-                ItemStack food = getRandomFood();
-                if (food != null) {
-                    inventory.setItem(getRandomSlot(inventory), food);
-                    foodCount++;
+            // 3. 음식 (config에서 확률 및 최대값 읽기)
+            int foodCount = 0;
+            int maxFood = config.getSupplyFoodMax();
+            double foodChance = config.getSupplyFoodChance();
+            for (int i = 0; i < 27 && foodCount < maxFood; i++) {
+                if (random.nextDouble() < foodChance) {
+                    ItemStack food = getRandomFood();
+                    if (food != null) {
+                        inventory.setItem(getRandomSlot(inventory), food);
+                        foodCount++;
+                    }
                 }
             }
-        }
 
-        // 4. 장비 (config에서 확률 및 최대값 읽기)
-        int equipmentCount = 0;
-        int maxEquipment = config.getSupplyEquipmentMax();
-        double equipmentChance = config.getSupplyEquipmentChance();
-        for (int i = 0; i < 27 && equipmentCount < maxEquipment; i++) {
-            if (random.nextDouble() < equipmentChance) {
-                ItemStack equipment = getRandomEquipment();
-                if (equipment != null) {
-                    inventory.setItem(getRandomSlot(inventory), equipment);
-                    equipmentCount++;
+            // 4. 장비 (config에서 확률 및 최대값 읽기)
+            int equipmentCount = 0;
+            int maxEquipment = config.getSupplyEquipmentMax();
+            double equipmentChance = config.getSupplyEquipmentChance();
+            for (int i = 0; i < 27 && equipmentCount < maxEquipment; i++) {
+                if (random.nextDouble() < equipmentChance) {
+                    ItemStack equipment = getRandomEquipment();
+                    if (equipment != null) {
+                        inventory.setItem(getRandomSlot(inventory), equipment);
+                        equipmentCount++;
+                    }
                 }
             }
-        }
 
-        // 5. 조약돌 (config에서 확률 및 개수 읽기)
-        if (random.nextDouble() < config.getSupplyCobblestoneChance()) {
-            int cobblestoneAmount = config.getSupplyCobblestoneAmount();
-            inventory.setItem(getRandomSlot(inventory), new ItemStack(Material.COBBLESTONE, cobblestoneAmount));
-        }
+            // 5. 조약돌 (config에서 확률 및 개수 읽기)
+            if (random.nextDouble() < config.getSupplyCobblestoneChance()) {
+                int cobblestoneAmount = config.getSupplyCobblestoneAmount();
+                inventory.setItem(getRandomSlot(inventory), new ItemStack(Material.COBBLESTONE, cobblestoneAmount));
+            }
 
-        // 5.5. 탄약 상자 (10% 확률로 레벨 0, 1, 2 한 세트 등장)
-        if (random.nextDouble() < 0.10) {
-            for (int level = 0; level <= 2; level++) {
-                int slot = getRandomSlot(inventory);
-                if (slot != -1) {
-                    inventory.setItem(slot, com.battleroyale.util.TaczItemUtil.createAmmoBox(level));
+            // 5.5. 탄약 상자 (10% 확률로 레벨 0, 1, 2 한 세트 등장)
+            if (random.nextDouble() < 0.10) {
+                for (int level = 0; level <= 2; level++) {
+                    int slot = getRandomSlot(inventory);
+                    if (slot != -1) {
+                        inventory.setItem(slot, com.battleroyale.util.TaczItemUtil.createAmmoBox(level));
+                    }
                 }
             }
-        }
 
-        // 6. 탄약 생성 로직 (기존 요청대로 복구: 칸당 확률)
-        // 총이 있으면 해당 총알이 8.5% 확률로, 없으면 무작위 총알이 4% 확률로 생성
-        double ammoChancePerSlot = (selectedGunAmmo != null) ? 0.085 : 0.04;
+            // 6. 탄약 생성 로직 (기존 요청대로 복구: 칸당 확률)
+            // 총이 있으면 해당 총알이 8.5% 확률로, 없으면 무작위 총알이 4% 확률로 생성
+            double ammoChancePerSlot = (selectedGunAmmo != null) ? 0.085 : 0.04;
 
-        for (int i = 0; i < 27; i++) {
-            if (inventory.getItem(i) == null && random.nextDouble() < ammoChancePerSlot) {
-                ItemStack ammo = getRandomAmmo(selectedGunAmmo);
-                if (ammo != null) {
-                    inventory.setItem(i, ammo);
+            for (int i = 0; i < 27; i++) {
+                if (inventory.getItem(i) == null && random.nextDouble() < ammoChancePerSlot) {
+                    ItemStack ammo = getRandomAmmo(selectedGunAmmo);
+                    if (ammo != null) {
+                        inventory.setItem(i, ammo);
+                    }
                 }
             }
+        } catch (Exception e) {
+            Bukkit.getLogger().severe("[BattleRoyale] 아이템 생성 중 오류 발생: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -151,6 +157,11 @@ public class SupplyLootGenerator {
         int epicWeight = config.getGunTierEpic();
         int legendaryWeight = config.getGunTierLegendary();
         int totalWeight = commonWeight + uncommonWeight + rareWeight + epicWeight + legendaryWeight;
+
+        if (totalWeight <= 0) {
+            Bukkit.getLogger().warning("[BattleRoyale] 총기 티어 확률 설정이 잘못되었습니다 (합계가 0).");
+            return null;
+        }
 
         GunData selected = null;
         int maxAttempts = 5; // 중복이 아닌 총을 찾기 위한 최대 시도 횟수

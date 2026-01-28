@@ -44,4 +44,22 @@ public class SupplyDropListener implements Listener {
             }
         }
     }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityExplode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        for (Block block : event.blockList()) {
+            if (plugin.getSupplyDropManager().isSupplyCrate(block.getLocation())) {
+                plugin.getSupplyDropManager().markSupplyBroken(block.getLocation());
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockExplode(org.bukkit.event.block.BlockExplodeEvent event) {
+        for (Block block : event.blockList()) {
+            if (plugin.getSupplyDropManager().isSupplyCrate(block.getLocation())) {
+                plugin.getSupplyDropManager().markSupplyBroken(block.getLocation());
+            }
+        }
+    }
 }

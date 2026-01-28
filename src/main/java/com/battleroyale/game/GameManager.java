@@ -12,6 +12,8 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -198,6 +200,9 @@ public class GameManager {
                     player.setFoodLevel(20);
                     player.getInventory().clear();
                     player.setGameMode(GameMode.SURVIVAL);
+
+                    // 야간 투시 부여 (영구)
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 999999, 0, false, false));
 
                     // 보급품 탐지 나침반 및 보트 지급
                     giveSupplyCompass(player);
@@ -698,6 +703,9 @@ public class GameManager {
 
                 player.spigot().respawn();
                 player.teleport(spawnLoc);
+
+                // 야간 투시 부여 (영구)
+                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 999999, 0, false, false));
 
                 // 최대 체력 설정 후 현재 체력 설정
                 double maxHealth = plugin.getConfigManager().getMaxHealth();

@@ -9,6 +9,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 /**
  * 플레이어 접속 이벤트 처리
@@ -39,6 +41,9 @@ public class PlayerJoinListener implements Listener {
             if (gameManager.getPlayerData(player.getUniqueId()) == null) {
                 player.setGameMode(GameMode.SPECTATOR);
                 player.sendMessage("§e[배틀로얄 2.0] 게임이 진행 중입니다. 관전 모드로 전환됩니다.");
+            } else {
+                // 생존자로 참가 중이면 야간 투시 부여
+                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 999999, 0, false, false));
             }
         }
     }
