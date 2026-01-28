@@ -12,8 +12,6 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.attribute.Attribute;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.title.Title;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -838,10 +836,10 @@ public class GameManager {
         ItemStack compass = new ItemStack(Material.COMPASS);
         ItemMeta meta = compass.getItemMeta();
         if (meta != null) {
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§e§l보급품 탐지기"));
-            meta.lore(Arrays.asList(
-                    LegacyComponentSerializer.legacySection().deserialize("§7가장 가까운 미개봉 보급품을 가리킵니다"),
-                    LegacyComponentSerializer.legacySection().deserialize("§7열린 보급품은 자동으로 제외됩니다")));
+            meta.setDisplayName("§e§l보급품 탐지기");
+            meta.setLore(Arrays.asList(
+                    "§7가장 가까운 미개봉 보급품을 가리킵니다",
+                    "§7열린 보급품은 자동으로 제외됩니다"));
             compass.setItemMeta(meta);
         }
         player.getInventory().addItem(compass);

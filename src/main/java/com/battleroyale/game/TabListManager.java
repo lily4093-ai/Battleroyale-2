@@ -5,7 +5,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 /**
  * TAB 리스트 관리 클래스
@@ -45,7 +44,7 @@ public class TabListManager {
 
         // 모든 플레이어의 TAB 리스트 초기화
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.playerListName(LegacyComponentSerializer.legacySection().deserialize(player.getName()));
+            player.setPlayerListName(player.getName());
         }
     }
 
@@ -58,7 +57,7 @@ public class TabListManager {
 
             if (data == null) {
                 // 게임에 참여하지 않은 플레이어 (관전자)
-                player.playerListName(LegacyComponentSerializer.legacySection().deserialize("§7" + player.getName()));
+                player.setPlayerListName("§7" + player.getName());
                 continue;
             }
 
@@ -71,7 +70,7 @@ public class TabListManager {
             // TAB 리스트 이름 설정
             String displayName = "§f" + player.getName() + " §7| " + pointsText + bountyText;
 
-            player.playerListName(LegacyComponentSerializer.legacySection().deserialize(displayName));
+            player.setPlayerListName(displayName);
         }
     }
 }

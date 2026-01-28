@@ -6,7 +6,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.*;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 /**
  * 스코어보드 관리 클래스
@@ -57,8 +56,7 @@ public class ScoreboardManager {
      */
     private void updateScoreboard(Player player) {
         Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("battleroyale", Criteria.DUMMY,
-                LegacyComponentSerializer.legacySection().deserialize("§6§l배틀로얄 2.0"));
+        Objective objective = scoreboard.registerNewObjective("battleroyale", "dummy", "§6§l배틀로얄 2.0");
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         GameState state = gameManager.getGameState();

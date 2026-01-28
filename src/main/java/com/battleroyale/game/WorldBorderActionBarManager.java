@@ -2,7 +2,8 @@ package com.battleroyale.game;
 
 import com.battleroyale.BattleRoyalePlugin;
 import org.bukkit.Bukkit;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.GameMode;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
@@ -104,7 +105,7 @@ public class WorldBorderActionBarManager {
         // 모든 플레이어에게 액션바 전송
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.SPECTATOR) {
-                player.sendActionBar(LegacyComponentSerializer.legacySection().deserialize(message));
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(message));
             }
         }
     }

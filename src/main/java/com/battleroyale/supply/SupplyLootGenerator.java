@@ -357,14 +357,11 @@ public class SupplyLootGenerator {
             return;
         org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
-            lore.add(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
-                    .deserialize("§7---"));
-            lore.add(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
-                    .deserialize("§7Grade: " + colorCode + "§l" + tierName));
-            lore.add(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
-                    .deserialize("§7---"));
-            meta.lore(lore);
+            List<String> lore = new ArrayList<>();
+            lore.add("§7---");
+            lore.add("§7Grade: " + colorCode + "§l" + tierName);
+            lore.add("§7---");
+            meta.setLore(lore);
             item.setItemMeta(meta);
         }
     }

@@ -231,12 +231,12 @@ public class TaczItemUtil {
 
         if (meta != null) {
             String displayName = getGunDisplayName(gunId);
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§f" + displayName));
-            meta.lore(java.util.Arrays.asList(
-                    LegacyComponentSerializer.legacySection().deserialize("§7총기: §e" + gunId),
-                    LegacyComponentSerializer.legacySection().deserialize("§7탄약: §e" + currentAmmo),
-                    LegacyComponentSerializer.legacySection().deserialize("§7발사 모드: §e" + fireMode),
-                    LegacyComponentSerializer.legacySection().deserialize("§c[플레이스홀더 - TACZ 로드 필요]")));
+            meta.setDisplayName("§f" + displayName);
+            meta.setLore(java.util.Arrays.asList(
+                    "§7총기: §e" + gunId,
+                    "§7탄약: §e" + currentAmmo,
+                    "§7발사 모드: §e" + fireMode,
+                    "§c[플레이스홀더 - TACZ 로드 필요]"));
             gun.setItemMeta(meta);
         }
 
@@ -252,10 +252,10 @@ public class TaczItemUtil {
 
         if (meta != null) {
             String displayName = getAttachmentDisplayName(attachmentId);
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§f" + displayName));
-            meta.lore(java.util.Arrays.asList(
-                    LegacyComponentSerializer.legacySection().deserialize("§7부착물: §e" + attachmentId),
-                    LegacyComponentSerializer.legacySection().deserialize("§c[플레이스홀더 - TACZ 로드 필요]")));
+            meta.setDisplayName("§f" + displayName);
+            meta.setLore(java.util.Arrays.asList(
+                    "§7부착물: §e" + attachmentId,
+                    "§c[플레이스홀더 - TACZ 로드 필요]"));
             attachment.setItemMeta(meta);
         }
 
@@ -271,10 +271,10 @@ public class TaczItemUtil {
 
         if (meta != null) {
             String displayName = getAmmoDisplayName(ammoId);
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§f" + displayName));
-            meta.lore(java.util.Arrays.asList(
-                    LegacyComponentSerializer.legacySection().deserialize("§7탄약: §e" + ammoId),
-                    LegacyComponentSerializer.legacySection().deserialize("§c[플레이스홀더 - TACZ 로드 필요]")));
+            meta.setDisplayName("§f" + displayName);
+            meta.setLore(java.util.Arrays.asList(
+                    "§7탄약: §e" + ammoId,
+                    "§c[플레이스홀더 - TACZ 로드 필요]"));
             ammo.setItemMeta(meta);
         }
 
