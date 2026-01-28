@@ -1,9 +1,8 @@
 package com.battleroyale.game;
 
 import com.battleroyale.BattleRoyalePlugin;
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.GameMode;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
@@ -93,22 +92,19 @@ public class WorldBorderActionBarManager {
         if (isShrinking) {
             // 축소 중일 때
             message = String.format(
-                "§7자기장 크기: §c%.0f §7→ §c%.0f §f| §7축소 진행률: §c%.0f%% §f| §7자기장 중심: §c(%.0f, %.0f) §f| §7현재 크기: §e%.0f",
-                previousSize, targetSize, progress, centerX, centerZ, currentSize
-            );
+                    "§7자기장 크기: §c%.0f §7→ §c%.0f §f| §7축소 진행률: §c%.0f%% §f| §7자기장 중심: §c(%.0f, %.0f) §f| §7현재 크기: §e%.0f",
+                    previousSize, targetSize, progress, centerX, centerZ, currentSize);
         } else {
             // 대기 중일 때
             message = String.format(
-                "§7자기장 중심: §c(%.0f, %.0f) §f| §7현재 크기: §e%.0f",
-                centerX, centerZ, currentSize
-            );
+                    "§7자기장 중심: §c(%.0f, %.0f) §f| §7현재 크기: §e%.0f",
+                    centerX, centerZ, currentSize);
         }
 
-        // 모든 플레이어에게 액션바 전송 (Arclight 호환)
-        TextComponent component = new TextComponent(message);
+        // 모든 플레이어에게 액션바 전송
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.SPECTATOR) {
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, component);
+                player.sendActionBar(LegacyComponentSerializer.legacySection().deserialize(message));
             }
         }
     }

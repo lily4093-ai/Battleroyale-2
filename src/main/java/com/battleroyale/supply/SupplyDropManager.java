@@ -8,9 +8,9 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 import java.util.*;
 
@@ -26,9 +26,9 @@ public class SupplyDropManager {
     private BossBar supplyBossBar;
     private BukkitTask supplyTask;
     private BukkitTask compassTask;
-    private int dropCount;
     private int totalDropsThisRound;
     private int completedDropsThisRound;
+    private int currentRoundNumber;
 
     // 보급품 위치 추적
     private final Set<Location> supplyCrateLocations = new HashSet<>();
@@ -40,7 +40,6 @@ public class SupplyDropManager {
     public SupplyDropManager(BattleRoyalePlugin plugin) {
         this.plugin = plugin;
         this.lootGenerator = new SupplyLootGenerator(plugin);
-        this.dropCount = 0;
     }
 
     /**
@@ -55,9 +54,10 @@ public class SupplyDropManager {
 
         totalDropsThisRound = 0;
         completedDropsThisRound = 0;
+        currentRoundNumber = roundNumber;
 
-        Bukkit.broadcastMessage("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 시작됩니다!");
-        Bukkit.broadcastMessage("§73초마다 2개의 보급 상자가 투하됩니다.");
+        broadcast("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 시작됩니다!");
+        broadcast("§73초마다 2개의 보급 상자가 투하됩니다.");
 
         createSupplyBossBar();
 
@@ -71,11 +71,11 @@ public class SupplyDropManager {
                 }
 
                 // 3초마다 2개씩 투하
-                scheduleAsyncDrop();
+                processSupplyDrop();
                 totalDropsThisRound++;
 
                 if (totalDropsThisRound < DROPS_PER_ROUND) {
-                    scheduleAsyncDrop();
+                    processSupplyDrop();
                     totalDropsThisRound++;
                 }
             }
@@ -83,9 +83,9 @@ public class SupplyDropManager {
     }
 
     /**
-     * 보급품 투하 처리 (Arclight 호환성)
+     * 보급품 투하 처리
      */
-    private void scheduleAsyncDrop() {
+    private void processSupplyDrop() {
         World world = Bukkit.getWorlds().get(0);
         WorldBorder border = world.getWorldBorder();
         Random random = new Random();
@@ -94,16 +94,15 @@ public class SupplyDropManager {
         double x = (random.nextDouble() * size * 2) - size;
         double z = (random.nextDouble() * size * 2) - size;
 
-        // 청크 로드 (Arclight 호환성을 위해 동기 방식 사용)
+        // 청크 로드 확인 및 처리
         int chunkX = (int) x >> 4;
         int chunkZ = (int) z >> 4;
 
         if (!world.isChunkLoaded(chunkX, chunkZ)) {
-            // 청크가 로드되지 않은 경우 로드
             world.loadChunk(chunkX, chunkZ);
         }
 
-        // 보급품 투하
+        // 보급품 투하 위치 탐색
         Location loc = findGroundLocationAt(world, x, z);
         if (loc != null) {
             dropSupplyCrateAt(loc);
@@ -112,7 +111,7 @@ public class SupplyDropManager {
 
             // 모든 투하가 완료되었는지 체크
             if (completedDropsThisRound >= DROPS_PER_ROUND) {
-                finishSupplyDrop(1);
+                finishSupplyDrop(currentRoundNumber);
             }
         }
     }
@@ -148,8 +147,6 @@ public class SupplyDropManager {
         // 보급품 위치 추적
         Location blockLoc = dropLocation.getBlock().getLocation();
         supplyCrateLocations.add(blockLoc);
-
-        dropCount++;
     }
 
     /**
@@ -189,7 +186,7 @@ public class SupplyDropManager {
      * 보급품 투하 완료
      */
     private void finishSupplyDrop(int roundNumber) {
-        Bukkit.broadcastMessage("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 완료되었습니다!");
+        broadcast("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 완료되었습니다!");
 
         if (supplyBossBar != null) {
             supplyBossBar.setVisible(false);
@@ -310,8 +307,15 @@ public class SupplyDropManager {
                     cleanupCounter = 0;
                 }
 
-                if (supplyCrateLocations.isEmpty())
+                if (supplyCrateLocations.isEmpty()) {
+                    // 모든 보급 상자가 사라진 경우 나침반 초기화
+                    for (Player player : Bukkit.getOnlinePlayers()) {
+                        if (player.getGameMode() == GameMode.SURVIVAL) {
+                            player.setCompassTarget(player.getWorld().getSpawnLocation());
+                        }
+                    }
                     return;
+                }
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (player.getGameMode() != GameMode.SURVIVAL) {
@@ -321,6 +325,9 @@ public class SupplyDropManager {
                     Location nearest = getNearestUnopenedSupply(player);
                     if (nearest != null) {
                         player.setCompassTarget(nearest);
+                    } else {
+                        // 더 이상 열지 않은 보급품이 없으면 스폰 지점으로 초기화
+                        player.setCompassTarget(player.getWorld().getSpawnLocation());
                     }
                 }
             }
@@ -340,20 +347,20 @@ public class SupplyDropManager {
             if (loc.getWorld() == null)
                 continue;
 
-            // 이미 열린 것으로 표시된 경우 제거
+            // 이미 열린 것으로 표시된 경우 목록에서 제거
             if (openedSupplyCrates.contains(loc)) {
                 iterator.remove();
+                openedSupplyCrates.remove(loc); // 메모리 관리: 추적 목록에서도 제거
                 continue;
             }
 
-            // 청크가 로드된 경우에만 블록 확인 (Arclight/Forge 지연 방지)
+            // 청크가 로드된 경우에만 블록 확인
             int chunkX = loc.getBlockX() >> 4;
             int chunkZ = loc.getBlockZ() >> 4;
 
             if (loc.getWorld().isChunkLoaded(chunkX, chunkZ)) {
                 Material type = loc.getBlock().getType();
-                if (type == Material.AIR || type != Material.CHEST) {
-                    openedSupplyCrates.add(loc);
+                if (type != Material.CHEST) {
                     iterator.remove();
                 }
             }
@@ -368,5 +375,9 @@ public class SupplyDropManager {
             compassTask.cancel();
             compassTask = null;
         }
+    }
+
+    private void broadcast(String message) {
+        Bukkit.broadcast(LegacyComponentSerializer.legacySection().deserialize(message));
     }
 }

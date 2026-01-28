@@ -57,7 +57,7 @@ public class BattleRoyalePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
         getServer().getPluginManager().registerEvents(new SupplyDropListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockRestrictionListener(this), this);
-        getServer().getPluginManager().registerEvents(new MobSpawnListener(this), this);
+        getServer().getPluginManager().registerEvents(new MobSpawnListener(), this);
     }
 
     public static BattleRoyalePlugin getInstance() {

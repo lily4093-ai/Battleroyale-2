@@ -11,7 +11,10 @@ import org.bukkit.scheduler.BukkitTask;
 
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-
+import org.bukkit.attribute.Attribute;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -84,7 +87,7 @@ public class GameManager {
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
 
         if (players.isEmpty()) {
-            Bukkit.broadcastMessage("§c[배틀로얄 2.0] 플레이어가 없어 게임을 시작할 수 없습니다!");
+            broadcast("§c[배틀로얄 2.0] 플레이어가 없어 게임을 시작할 수 없습니다!");
             gameState = GameState.WAITING;
             return;
         }
@@ -112,8 +115,8 @@ public class GameManager {
         // 플레이어 스폰 (월드보더 설정 후)
         spawnPlayers();
 
-        Bukkit.broadcastMessage("§a§l[배틀로얄 2.0] 게임이 시작되었습니다!");
-        Bukkit.broadcastMessage("§e팀 크기: §f" + teamSize + "명");
+        broadcast("§a§l[배틀로얄 2.0] 게임이 시작되었습니다!");
+        broadcast("§e팀 크기: §f" + teamSize + "명");
 
         // 타이머 시작
         startGameTimers();
@@ -187,7 +190,7 @@ public class GameManager {
 
                     // 최대 체력 설정 후 현재 체력 설정
                     double maxHealth = plugin.getConfigManager().getMaxHealth();
-                    player.setMaxHealth(maxHealth);
+                    player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
                     player.setHealth(maxHealth);
 
                     player.setFoodLevel(20);
@@ -303,7 +306,7 @@ public class GameManager {
         double initialSize = plugin.getConfigManager().getWorldBorderInitialSize();
         border.setSize(initialSize);
 
-        Bukkit.broadcastMessage("§e[배틀로얄 2.0] 월드보더가 설정되었습니다: §f" + (int) initialSize + "x" + (int) initialSize);
+        broadcast("§e[배틀로얄 2.0] 월드보더가 설정되었습니다: §f" + (int) initialSize + "x" + (int) initialSize);
 
         // config에서 수축 설정 읽기
         long shrinkInterval = plugin.getConfigManager().getWorldBorderShrinkInterval() * 20L; // 초를 틱으로 변환
@@ -318,7 +321,7 @@ public class GameManager {
                 if (currentStageIndex >= shrinkStages.size() - 1) {
                     // 마지막 단계 (0)에 도달하면 게임 종료
                     cancel();
-                    Bukkit.broadcastMessage("§c§l[배틀로얄 2.0] §e자기장이 완전히 축소되었습니다! 게임 종료!");
+                    broadcast("§c§l[배틀로얄 2.0] §e자기장이 완전히 축소되었습니다! 게임 종료!");
                     endGame();
                     return;
                 }
@@ -386,23 +389,23 @@ public class GameManager {
         new BukkitRunnable() {
             @Override
             public void run() {
-                Bukkit.broadcastMessage("");
-                Bukkit.broadcastMessage("§6§l========== [게임 규칙] ==========");
-                Bukkit.broadcastMessage("§e1. §f시작 포인트: §a1000점");
-                Bukkit.broadcastMessage("§e2. §f킬 보상: §a500 + 피해자 포인트 (현상금 2배)");
-                Bukkit.broadcastMessage("§e3. §f사망 패널티: §c포인트 50% 감소");
-                Bukkit.broadcastMessage("§e4. §f리스폰: §a1분 후 (데스타임 30초)");
-                Bukkit.broadcastMessage("§e5. §f현상금: §c5분 후 활성화, 3분마다 교체");
-                Bukkit.broadcastMessage("§e6. §f데스타임: §c모두 2번 사망 후 시작, 5분간 진행");
-                Bukkit.broadcastMessage("");
-                Bukkit.broadcastMessage("§c§l[건축 규칙]");
-                Bukkit.broadcastMessage("§7• §f블럭은 §e임시 엄폐용§f으로만 사용 가능");
-                Bukkit.broadcastMessage("§7• §c땅을 파고 들어가는 행위 금지");
-                Bukkit.broadcastMessage("§7• §c블럭을 쌓고 높이 올라가는 행위 금지");
-                Bukkit.broadcastMessage("§7• §a달리면서 블럭 설치, 총알 막기용 설치 허용");
-                Bukkit.broadcastMessage("§7• §a엄폐한 블럭 파괴는 허용");
-                Bukkit.broadcastMessage("§6§l================================");
-                Bukkit.broadcastMessage("");
+                broadcast("");
+                broadcast("§6§l========== [게임 규칙] ==========");
+                broadcast("§e1. §f시작 포인트: §a1000점");
+                broadcast("§e2. §f킬 보상: §a500 + 피해자 포인트 (현상금 2배)");
+                broadcast("§e3. §f사망 패널티: §c포인트 50% 감소");
+                broadcast("§e4. §f리스폰: §a1분 후 (데스타임 30초)");
+                broadcast("§e5. §f현상금: §c5분 후 활성화, 3분마다 교체");
+                broadcast("§e6. §f데스타임: §c모두 2번 사망 후 시작, 5분간 진행");
+                broadcast("");
+                broadcast("§c§l[건축 규칙]");
+                broadcast("§7• §f블럭은 §e임시 엄폐용§f으로만 사용 가능");
+                broadcast("§7• §c땅을 파고 들어가는 행위 금지");
+                broadcast("§7• §c블럭을 쌓고 높이 올라가는 행위 금지");
+                broadcast("§7• §a달리면서 블럭 설치, 총알 막기용 설치 허용");
+                broadcast("§7• §a엄폐한 블럭 파괴는 허용");
+                broadcast("§6§l================================");
+                broadcast("");
             }
         }.runTaskLater(plugin, 40L); // 2초 후 표시
     }
@@ -470,11 +473,15 @@ public class GameManager {
                     if (target != null) {
                         // 최종 타이틀 표시
                         for (Player p : Bukkit.getOnlinePlayers()) {
-                            p.sendTitle("§c§l[ 현상금 ]", "§e" + target.getName(), 10, 40, 10);
+                            p.showTitle(Title.title(
+                                    LegacyComponentSerializer.legacySection().deserialize("§c§l[ 현상금 ]"),
+                                    LegacyComponentSerializer.legacySection().deserialize("§e" + target.getName()),
+                                    Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(2000),
+                                            Duration.ofMillis(500))));
                             p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                         }
 
-                        Bukkit.broadcastMessage("§c§l[배틀로얄 2.0] §e" + target.getName() + "§f님이 현상금 수배자로 지정되었습니다!");
+                        broadcast("§c§l[배틀로얄 2.0] §e" + target.getName() + "§f님이 현상금 수배자로 지정되었습니다!");
                     }
 
                     createBountyBossBar();
@@ -484,10 +491,13 @@ public class GameManager {
 
                 // 슬롯머신 효과
                 UUID randomPlayer = alivePlayers.get(new Random().nextInt(alivePlayers.size()));
-                Player p = Bukkit.getPlayer(randomPlayer);
-                if (p != null) {
+                Player targetPlayer = Bukkit.getPlayer(randomPlayer);
+                if (targetPlayer != null) {
                     for (Player online : Bukkit.getOnlinePlayers()) {
-                        online.sendTitle("§c§l[ 현상금 ]", "§f" + p.getName(), 0, 5, 0);
+                        online.showTitle(Title.title(
+                                LegacyComponentSerializer.legacySection().deserialize("§c§l[ 현상금 ]"),
+                                LegacyComponentSerializer.legacySection().deserialize("§f" + targetPlayer.getName()),
+                                Title.Times.times(Duration.ZERO, Duration.ofMillis(250), Duration.ZERO)));
                     }
                 }
 
@@ -564,12 +574,12 @@ public class GameManager {
         deathTimeStartTime = System.currentTimeMillis();
         gameState = GameState.DEATH_TIME;
 
-        Bukkit.broadcastMessage("§c§l=================================");
-        Bukkit.broadcastMessage("§4§l         데스타임 시작!");
-        Bukkit.broadcastMessage("§c모든 플레이어가 현상금 상태가 됩니다!");
-        Bukkit.broadcastMessage("§c리스폰 시간이 30초로 단축됩니다!");
-        Bukkit.broadcastMessage("§c5분 후 게임이 종료됩니다!");
-        Bukkit.broadcastMessage("§c§l=================================");
+        broadcast("§c§l=================================");
+        broadcast("§4§l         데스타임 시작!");
+        broadcast("§c모든 플레이어가 현상금 상태가 됩니다!");
+        broadcast("§c리스폰 시간이 30초로 단축됩니다!");
+        broadcast("§c5분 후 게임이 종료됩니다!");
+        broadcast("§c§l=================================");
 
         // 모든 플레이어를 현상금 상태로
         for (PlayerData data : playerDataMap.values()) {
@@ -664,7 +674,7 @@ public class GameManager {
 
         // 킬 메시지
         String bountyText = victimData.isBountyTarget() ? " §c[현상금]" : "";
-        Bukkit.broadcastMessage("§e[배틀로얄 2.0] §f" + killer.getName() + " §7→ §f" + victim.getName() + bountyText);
+        broadcast("§e[배틀로얄 2.0] §f" + killer.getName() + " §7→ §f" + victim.getName() + bountyText);
     }
 
     /**
@@ -686,7 +696,7 @@ public class GameManager {
 
                 // 최대 체력 설정 후 현재 체력 설정
                 double maxHealth = plugin.getConfigManager().getMaxHealth();
-                player.setMaxHealth(maxHealth);
+                player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
                 player.setHealth(maxHealth);
 
                 player.setFoodLevel(20);
@@ -742,11 +752,11 @@ public class GameManager {
                 .sorted((a, b) -> Integer.compare(b.getValue().getPoints(), a.getValue().getPoints()))
                 .collect(Collectors.toList());
 
-        Bukkit.broadcastMessage("§6§l=================================");
-        Bukkit.broadcastMessage("§e§l       게임 종료!");
-        Bukkit.broadcastMessage("§6§l=================================");
-        Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage("§e§l최종 순위:");
+        broadcast("§6§l=================================");
+        broadcast("§e§l       게임 종료!");
+        broadcast("§6§l=================================");
+        broadcast("");
+        broadcast("§e§l최종 순위:");
 
         for (int i = 0; i < Math.min(5, rankings.size()); i++) {
             Map.Entry<UUID, PlayerData> entry = rankings.get(i);
@@ -755,11 +765,11 @@ public class GameManager {
             int points = entry.getValue().getPoints();
 
             String medal = i == 0 ? "§6🥇" : i == 1 ? "§7🥈" : i == 2 ? "§c🥉" : "§f" + (i + 1) + ".";
-            Bukkit.broadcastMessage(medal + " §f" + name + " §e- " + points + "점");
+            broadcast(medal + " §f" + name + " §e- " + points + "점");
         }
 
-        Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage("§6§l=================================");
+        broadcast("");
+        broadcast("§6§l=================================");
 
         // 정리
         cleanup();
@@ -773,7 +783,7 @@ public class GameManager {
             return;
         }
 
-        Bukkit.broadcastMessage("§c[배틀로얄 2.0] 게임이 강제 종료되었습니다!");
+        broadcast("§c[배틀로얄 2.0] 게임이 강제 종료되었습니다!");
         cleanup();
     }
 
@@ -858,12 +868,16 @@ public class GameManager {
         ItemStack compass = new ItemStack(Material.COMPASS);
         ItemMeta meta = compass.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName("§e§l보급품 탐지기");
-            meta.setLore(Arrays.asList(
-                    "§7가장 가까운 미개봉 보급품을 가리킵니다",
-                    "§7열린 보급품은 자동으로 제외됩니다"));
+            meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§e§l보급품 탐지기"));
+            meta.lore(Arrays.asList(
+                    LegacyComponentSerializer.legacySection().deserialize("§7가장 가까운 미개봉 보급품을 가리킵니다"),
+                    LegacyComponentSerializer.legacySection().deserialize("§7열린 보급품은 자동으로 제외됩니다")));
             compass.setItemMeta(meta);
         }
         player.getInventory().addItem(compass);
+    }
+
+    private void broadcast(String message) {
+        Bukkit.broadcast(LegacyComponentSerializer.legacySection().deserialize(message));
     }
 }

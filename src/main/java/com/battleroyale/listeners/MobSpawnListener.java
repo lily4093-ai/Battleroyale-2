@@ -1,6 +1,5 @@
 package com.battleroyale.listeners;
 
-import com.battleroyale.BattleRoyalePlugin;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,10 +13,7 @@ import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
  */
 public class MobSpawnListener implements Listener {
 
-    private final BattleRoyalePlugin plugin;
-
-    public MobSpawnListener(BattleRoyalePlugin plugin) {
-        this.plugin = plugin;
+    public MobSpawnListener() {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
