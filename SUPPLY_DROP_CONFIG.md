@@ -125,6 +125,7 @@
 - **50ae**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:50ae"}}`     최대 48개
 - **9mm**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:9mm"}}`       최대 60개
 - **357mag**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:357mag"}}` 최대 48개
+- **308**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:308"}}`       최대 48개
 - **45acp**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:45acp"}}`   최대 60개
 - **556x45**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:556x45"}}` 최대 60개
 - **30_06**: `{id:"tacz:ammo",tag:{AmmoId:"tacz:30_06"}}`   최대 36개

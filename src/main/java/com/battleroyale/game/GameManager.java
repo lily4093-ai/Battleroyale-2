@@ -109,7 +109,9 @@ public class GameManager {
         gameState = GameState.ACTIVE;
         gameStartTime = System.currentTimeMillis();
 
-        // 월드보더 먼저 설정 (스폰 위치 계산 전에 필요)
+        // 월드보더 및 게임룰 설정
+        World world = Bukkit.getWorlds().get(0);
+        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
         setupWorldBorder();
 
         // 플레이어 스폰 (월드보더 설정 후)
@@ -347,39 +349,14 @@ public class GameManager {
 
     /**
      * 보급품 투하 스케줄
-     * 게임 시작 직후 1회, 이후 5분마다 총 3회
+     * 2초마다 1개씩 상시 투하 방식으로 변경
      */
     private void scheduleSupplyDrops() {
         // 나침반 업데이트 시작
         plugin.getSupplyDropManager().startCompassUpdater();
 
-        // 1차 투하 - 게임 시작 직후
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                plugin.getSupplyDropManager().startSupplyDrop(1);
-            }
-        }.runTaskLater(plugin, 20L); // 1초 후
-
-        // 2차 투하 - 5분 후
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (gameState == GameState.ACTIVE || gameState == GameState.DEATH_TIME) {
-                    plugin.getSupplyDropManager().startSupplyDrop(2);
-                }
-            }
-        }.runTaskLater(plugin, 5 * 60 * 20L);
-
-        // 3차 투하 - 10분 후
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (gameState == GameState.ACTIVE || gameState == GameState.DEATH_TIME) {
-                    plugin.getSupplyDropManager().startSupplyDrop(3);
-                }
-            }
-        }.runTaskLater(plugin, 10 * 60 * 20L);
+        // 상시 투하 시작
+        plugin.getSupplyDropManager().startContinuousSupplyDrop();
     }
 
     /**
@@ -471,13 +448,9 @@ public class GameManager {
 
                     Player target = Bukkit.getPlayer(selected);
                     if (target != null) {
-                        // 최종 타이틀 표시
+                        // 최종 타이틀 표시 (Legacy 방식)
                         for (Player p : Bukkit.getOnlinePlayers()) {
-                            p.showTitle(Title.title(
-                                    LegacyComponentSerializer.legacySection().deserialize("§c§l[ 현상금 ]"),
-                                    LegacyComponentSerializer.legacySection().deserialize("§e" + target.getName()),
-                                    Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(2000),
-                                            Duration.ofMillis(500))));
+                            p.sendTitle("§c§l[ 현상금 ]", "§e" + target.getName(), 10, 40, 10);
                             p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                         }
 
@@ -489,15 +462,12 @@ public class GameManager {
                     return;
                 }
 
-                // 슬롯머신 효과
+                // 슬롯머신 효과 (Legacy 방식)
                 UUID randomPlayer = alivePlayers.get(new Random().nextInt(alivePlayers.size()));
                 Player targetPlayer = Bukkit.getPlayer(randomPlayer);
                 if (targetPlayer != null) {
                     for (Player online : Bukkit.getOnlinePlayers()) {
-                        online.showTitle(Title.title(
-                                LegacyComponentSerializer.legacySection().deserialize("§c§l[ 현상금 ]"),
-                                LegacyComponentSerializer.legacySection().deserialize("§f" + targetPlayer.getName()),
-                                Title.Times.times(Duration.ZERO, Duration.ofMillis(250), Duration.ZERO)));
+                        online.sendTitle("§c§l[ 현상금 ]", "§f" + targetPlayer.getName(), 0, 5, 0);
                     }
                 }
 
@@ -878,6 +848,6 @@ public class GameManager {
     }
 
     private void broadcast(String message) {
-        Bukkit.broadcast(LegacyComponentSerializer.legacySection().deserialize(message));
+        Bukkit.broadcastMessage(message);
     }
 }

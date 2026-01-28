@@ -29,69 +29,85 @@ public class BRCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("battleroyale.admin")) {
-            sender.sendMessage("§c[배틀로얄 2.0] 권한이 없습니다!");
-            return true;
-        }
+        try {
+            if (!sender.hasPermission("battleroyale.admin")) {
+                sender.sendMessage("§c[배틀로얄 2.0] 권한이 없습니다!");
+                return true;
+            }
 
-        if (args.length == 0) {
-            sendHelp(sender);
-            return true;
-        }
-
-        GameManager gameManager = plugin.getGameManager();
-
-        switch (args[0].toLowerCase()) {
-            case "start":
-                if (args.length < 2) {
-                    sender.sendMessage("§c[배틀로얄 2.0] 사용법: /br start <팀원 수>");
-                    return true;
-                }
-
-                try {
-                    int teamSize = Integer.parseInt(args[1]);
-
-                    if (teamSize < 1) {
-                        sender.sendMessage("§c[배틀로얄 2.0] 팀원 수는 1명 이상이어야 합니다!");
-                        return true;
-                    }
-
-                    if (gameManager.getGameState() != GameState.WAITING) {
-                        sender.sendMessage("§c[배틀로얄 2.0] 이미 게임이 진행 중입니다!");
-                        return true;
-                    }
-
-                    gameManager.startGame(teamSize);
-                    sender.sendMessage("§a[배틀로얄 2.0] 게임을 시작합니다! (팀원 수: " + teamSize + "명)");
-
-                } catch (NumberFormatException e) {
-                    sender.sendMessage("§c[배틀로얄 2.0] 올바른 숫자를 입력해주세요!");
-                }
-                break;
-
-            case "stop":
-                if (gameManager.getGameState() == GameState.WAITING) {
-                    sender.sendMessage("§c[배틀로얄 2.0] 진행 중인 게임이 없습니다!");
-                    return true;
-                }
-
-                gameManager.stopGame();
-                sender.sendMessage("§a[배틀로얄 2.0] 게임을 강제 종료했습니다!");
-                break;
-
-            case "info":
-                sendGameInfo(sender, gameManager);
-                break;
-
-            case "reload":
-                plugin.getConfigManager().reloadConfig();
-                sender.sendMessage("§a[배틀로얄 2.0] 설정 파일을 리로드했습니다!");
-                sender.sendMessage("§7주의: 게임 진행 중에는 일부 설정이 적용되지 않을 수 있습니다.");
-                break;
-
-            default:
+            if (args.length == 0) {
                 sendHelp(sender);
-                break;
+                return true;
+            }
+
+            GameManager gameManager = plugin.getGameManager();
+            String subCommand = args[0].toLowerCase();
+
+            switch (subCommand) {
+                case "start":
+                    if (args.length < 2) {
+                        sender.sendMessage("§c[배틀로얄 2.0] 사용법: /br start <팀원 수>");
+                        return true;
+                    }
+
+                    try {
+                        int teamSize = Integer.parseInt(args[1]);
+
+                        if (teamSize < 1) {
+                            sender.sendMessage("§c[배틀로얄 2.0] 팀원 수는 1명 이상이어야 합니다!");
+                            return true;
+                        }
+
+                        if (gameManager.getGameState() != GameState.WAITING) {
+                            sender.sendMessage("§c[배틀로얄 2.0] 이미 게임이 진행 중입니다!");
+                            return true;
+                        }
+
+                        gameManager.startGame(teamSize);
+                        sender.sendMessage("§a[배틀로얄 2.0] 게임을 시작합니다! (팀원 수: " + teamSize + "명)");
+
+                    } catch (NumberFormatException e) {
+                        sender.sendMessage("§c[배틀로얄 2.0] 올바른 숫자를 입력해주세요!");
+                    }
+                    break;
+
+                case "stop":
+                    if (gameManager.getGameState() == GameState.WAITING) {
+                        sender.sendMessage("§c[배틀로얄 2.0] 진행 중인 게임이 없습니다!");
+                        return true;
+                    }
+
+                    gameManager.stopGame();
+                    sender.sendMessage("§a[배틀로얄 2.0] 게임을 강제 종료했습니다!");
+                    break;
+
+                case "info":
+                    sendGameInfo(sender, gameManager);
+                    break;
+
+                case "reload":
+                    plugin.getConfigManager().reloadConfig();
+                    sender.sendMessage("§a[배틀로얄 2.0] 설정 파일을 리로드했습니다!");
+                    sender.sendMessage("§7주의: 게임 진행 중에는 일부 설정이 적용되지 않을 수 있습니다.");
+                    break;
+
+                case "testloot":
+                    if (!(sender instanceof Player)) {
+                        sender.sendMessage("§c[배틀로얄 2.0] 플레이어만 이 명령어를 사용할 수 있습니다!");
+                        return true;
+                    }
+                    Player player = (Player) sender;
+                    plugin.getSupplyDropManager().dropSupplyCrateAt(player.getLocation());
+                    sender.sendMessage("§a[배틀로얄 2.0] 현재 위치에 테스트 보급 상자를 생성했습니다!");
+                    break;
+
+                default:
+                    sendHelp(sender);
+                    break;
+            }
+        } catch (Exception e) {
+            sender.sendMessage("§c[배틀로얄 2.0] 명령어 실행 중 내부 오류가 발생했습니다!");
+            e.printStackTrace();
         }
 
         return true;
@@ -106,6 +122,7 @@ public class BRCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/br stop §7- 게임 강제 종료");
         sender.sendMessage("§e/br info §7- 게임 정보 확인");
         sender.sendMessage("§e/br reload §7- 설정 파일 리로드");
+        sender.sendMessage("§e/br testloot §7- 현재 위치에 보급 상자 생성 (테스트용)");
         sender.sendMessage("§6§l================================");
     }
 
@@ -153,7 +170,7 @@ public class BRCommand implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            completions.addAll(Arrays.asList("start", "stop", "info", "reload"));
+            completions.addAll(Arrays.asList("start", "stop", "info", "reload", "testloot"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             completions.addAll(Arrays.asList("1", "2", "3", "4", "5"));
         }

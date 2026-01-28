@@ -13,31 +13,42 @@ import java.util.*;
  * SUPPLY_DROP_CONFIG.md의 확률과 규칙에 따라 아이템 생성
  */
 public class SupplyLootGenerator {
-    
+
     private final Random random = new Random();
     private final ConfigManager config;
-    
+
     public SupplyLootGenerator(BattleRoyalePlugin plugin) {
         this.config = plugin.getConfigManager();
     }
-    
+
     /**
      * 보급 상자에 루팅 생성
      */
     public void generateLoot(Inventory inventory) {
         inventory.clear();
-        
+
         String selectedGunAmmo = null;
-        
+
         // 1. 총기 (config에서 확률 읽기)
         if (random.nextDouble() < config.getSupplyGunChance()) {
             GunData gun = selectRandomGun();
             if (gun != null) {
                 inventory.setItem(getRandomSlot(inventory), gun.itemStack);
                 selectedGunAmmo = gun.ammoType;
+
+                // 미니건일 경우 .308 탄약 4세트(풀 스택) 확정 추가
+                if ("tacz:minigun".equals(gun.gunId)) {
+                    for (int i = 0; i < 4; i++) {
+                        ItemStack ammo = com.battleroyale.util.TaczItemUtil.createAmmo("tacz:308", 48);
+                        int slot = getRandomSlot(inventory);
+                        if (slot != -1) {
+                            inventory.setItem(slot, ammo);
+                        }
+                    }
+                }
             }
         }
-        
+
         // 2. 부착물 (config에서 확률 및 최대값 읽기)
         int attachmentCount = 0;
         int maxAttachments = config.getSupplyAttachmentMax();
@@ -51,7 +62,7 @@ public class SupplyLootGenerator {
                 }
             }
         }
-        
+
         // 3. 음식 (config에서 확률 및 최대값 읽기)
         int foodCount = 0;
         int maxFood = config.getSupplyFoodMax();
@@ -65,7 +76,7 @@ public class SupplyLootGenerator {
                 }
             }
         }
-        
+
         // 4. 장비 (config에서 확률 및 최대값 읽기)
         int equipmentCount = 0;
         int maxEquipment = config.getSupplyEquipmentMax();
@@ -79,15 +90,17 @@ public class SupplyLootGenerator {
                 }
             }
         }
-        
+
         // 5. 조약돌 (config에서 확률 및 개수 읽기)
         if (random.nextDouble() < config.getSupplyCobblestoneChance()) {
             int cobblestoneAmount = config.getSupplyCobblestoneAmount();
             inventory.setItem(getRandomSlot(inventory), new ItemStack(Material.COBBLESTONE, cobblestoneAmount));
         }
-        
-        // 6. 탄약 (config에서 확률 읽기)
-        double ammoChance = config.getSupplyAmmoChance();
+
+        // 6. 탄약 생성 로직 개편
+        // 총이 있으면 해당 총알이 8.5% 확률로, 없으면 무작위 총알이 4% 확률로 생성
+        double ammoChance = (selectedGunAmmo != null) ? 0.085 : 0.04;
+
         for (int i = 0; i < 27; i++) {
             if (inventory.getItem(i) == null && random.nextDouble() < ammoChance) {
                 ItemStack ammo = getRandomAmmo(selectedGunAmmo);
@@ -97,7 +110,7 @@ public class SupplyLootGenerator {
             }
         }
     }
-    
+
     /**
      * 빈 슬롯 찾기
      */
@@ -108,14 +121,14 @@ public class SupplyLootGenerator {
                 emptySlots.add(i);
             }
         }
-        
+
         if (emptySlots.isEmpty()) {
             return random.nextInt(27);
         }
-        
+
         return emptySlots.get(random.nextInt(emptySlots.size()));
     }
-    
+
     /**
      * 티어별 총기 선택
      */
@@ -126,9 +139,9 @@ public class SupplyLootGenerator {
         int epicWeight = config.getGunTierEpic();
         int legendaryWeight = config.getGunTierLegendary();
         int totalWeight = commonWeight + uncommonWeight + rareWeight + epicWeight + legendaryWeight;
-        
+
         int roll = random.nextInt(totalWeight);
-        
+
         if (roll < legendaryWeight) {
             return getRandomLegendaryGun();
         } else if (roll < legendaryWeight + epicWeight) {
@@ -141,155 +154,156 @@ public class SupplyLootGenerator {
             return getRandomCommonGun();
         }
     }
-    
+
     /**
      * Common 총기
      */
     private GunData getRandomCommonGun() {
         List<GunData> guns = Arrays.asList(
-            new GunData(createTaczGun("tacz:glock_17", 17, "SEMI"), "9mm"),
-            new GunData(createTaczGun("tacz:m1911", 7, "SEMI"), "45acp"),
-            new GunData(createTaczGun("tacz:uzi", 12, "AUTO"), "9mm"),
-            new GunData(createTaczGun("tacz:hk_mp5a5", 20, "AUTO"), "9mm"),
-            new GunData(createTaczGun("tacz:db_long", 2, "SEMI"), "12g"),
-            new GunData(createTaczGun("tacz:m870", 5, "SEMI"), "12g")
-        );
-        return guns.get(random.nextInt(guns.size()));
+                new GunData(createTaczGun("tacz:glock_17", 17, "SEMI"), "9mm", "tacz:glock_17"),
+                new GunData(createTaczGun("tacz:m1911", 7, "SEMI"), "45acp", "tacz:m1911"),
+                new GunData(createTaczGun("tacz:uzi", 12, "AUTO"), "9mm", "tacz:uzi"),
+                new GunData(createTaczGun("tacz:hk_mp5a5", 20, "AUTO"), "9mm", "tacz:hk_mp5a5"),
+                new GunData(createTaczGun("tacz:db_long", 2, "SEMI"), "12g", "tacz:db_long"),
+                new GunData(createTaczGun("tacz:m870", 5, "SEMI"), "12g", "tacz:m870"));
+        GunData selected = guns.get(random.nextInt(guns.size()));
+        addTierLore(selected.itemStack, "COMMON", "§f");
+        return selected;
     }
-    
+
     /**
      * Uncommon 총기
      */
     private GunData getRandomUncommonGun() {
         List<GunData> guns = Arrays.asList(
-            new GunData(createTaczGun("tacz:scar_l", 30, "AUTO"), "556x45"),
-            new GunData(createTaczGun("tacz:aug", 30, "AUTO"), "556x45"),
-            new GunData(createTaczGun("tacz:m16a1", 20, "AUTO"), "556x45"),
-            new GunData(createTaczGun("tacz:hk416d", 30, "AUTO"), "556x45"),
-            new GunData(createTaczGun("tacz:ump45", 25, "AUTO"), "45acp"),
-            new GunData(createTaczGun("tacz:vector45", 21, "AUTO"), "45acp"),
-            new GunData(createTaczGun("tacz:spas_12", 5, "SEMI"), "12g"),
-            new GunData(createTaczGun("tacz:aa12", 6, "SEMI"), "12g"),
-            new GunData(createTaczGun("tacz:m1014", 6, "SEMI"), "12g")
-        );
-        return guns.get(random.nextInt(guns.size()));
+                new GunData(createTaczGun("tacz:scar_l", 30, "AUTO"), "556x45", "tacz:scar_l"),
+                new GunData(createTaczGun("tacz:aug", 30, "AUTO"), "556x45", "tacz:aug"),
+                new GunData(createTaczGun("tacz:m16a1", 20, "AUTO"), "556x45", "tacz:m16a1"),
+                new GunData(createTaczGun("tacz:hk416d", 30, "AUTO"), "556x45", "tacz:hk416d"),
+                new GunData(createTaczGun("tacz:ump45", 25, "AUTO"), "45acp", "tacz:ump45"),
+                new GunData(createTaczGun("tacz:vector45", 21, "AUTO"), "45acp", "tacz:vector45"),
+                new GunData(createTaczGun("tacz:spas_12", 5, "SEMI"), "12g", "tacz:spas_12"),
+                new GunData(createTaczGun("tacz:aa12", 6, "SEMI"), "12g", "tacz:aa12"),
+                new GunData(createTaczGun("tacz:m1014", 6, "SEMI"), "12g", "tacz:m1014"));
+        GunData selected = guns.get(random.nextInt(guns.size()));
+        addTierLore(selected.itemStack, "UNCOMMON", "§a");
+        return selected;
     }
-    
+
     /**
      * Rare 총기
      */
     private GunData getRandomRareGun() {
         List<GunData> guns = Arrays.asList(
-            new GunData(createTaczGun("tacz:deagle", 7, "SEMI"), "50ae"),
-            new GunData(createTaczGun("tacz:sks_tactical", 10, "SEMI"), "762x39"),
-            new GunData(createTaczGun("tacz:qbz_191", 30, "AUTO"), "556x45"),
-            new GunData(createTaczGun("tacz:ak47", 30, "AUTO"), "762x39"),
-            new GunData(createTaczGun("tacz:m700", 5, "SEMI"), "30_06"),
-            new GunData(createTaczGun("tacz:springfield1873", 1, "SEMI"), "30_06")
-        );
-        return guns.get(random.nextInt(guns.size()));
+                new GunData(createTaczGun("tacz:deagle", 7, "SEMI"), "50ae", "tacz:deagle"),
+                new GunData(createTaczGun("tacz:sks_tactical", 10, "SEMI"), "762x39", "tacz:sks_tactical"),
+                new GunData(createTaczGun("tacz:qbz_191", 30, "AUTO"), "556x45", "tacz:qbz_191"),
+                new GunData(createTaczGun("tacz:ak47", 30, "AUTO"), "762x39", "tacz:ak47"),
+                new GunData(createTaczGun("tacz:m700", 5, "SEMI"), "30_06", "tacz:m700"),
+                new GunData(createTaczGun("tacz:springfield1873", 1, "SEMI"), "30_06", "tacz:springfield1873"));
+        GunData selected = guns.get(random.nextInt(guns.size()));
+        addTierLore(selected.itemStack, "RARE", "§b");
+        return selected;
     }
-    
+
     /**
      * Epic 총기
      */
     private GunData getRandomEpicGun() {
         List<GunData> guns = Arrays.asList(
-            new GunData(createTaczGun("tacz:deagle_golden", 9, "SEMI"), "357mag"),
-            new GunData(createTaczGun("tacz:timeless50", 6, "SEMI"), "50ae"),
-            new GunData(createTaczGun("tacz:mk14", 10, "SEMI"), "762x39"),
-            new GunData(createTaczGun("tacz:scar_h", 20, "SEMI"), "762x39"),
-            new GunData(createTaczGun("tacz:fn_fal", 20, "SEMI"), "762x39"),
-            new GunData(createTaczGun("tacz:ai_awp", 5, "SEMI"), "338"),
-            new GunData(createTaczGun("tacz:rpk", 40, "AUTO"), "762x39"),
-            new GunData(createTaczGun("tacz:fn_evolys", 30, "AUTO"), "556x45"),
-            new GunData(createTaczGun("tacz:m249", 64, "AUTO"), "556x45")
-        );
-        return guns.get(random.nextInt(guns.size()));
+                new GunData(createTaczGun("tacz:deagle_golden", 9, "SEMI"), "357mag", "tacz:deagle_golden"),
+                new GunData(createTaczGun("tacz:timeless50", 6, "SEMI"), "50ae", "tacz:timeless50"),
+                new GunData(createTaczGun("tacz:mk14", 10, "SEMI"), "308", "tacz:mk14"),
+                new GunData(createTaczGun("tacz:scar_h", 20, "SEMI"), "308", "tacz:scar_h"),
+                new GunData(createTaczGun("tacz:fn_fal", 20, "SEMI"), "308", "tacz:fn_fal"),
+                new GunData(createTaczGun("tacz:ai_awp", 5, "SEMI"), "338", "tacz:ai_awp"),
+                new GunData(createTaczGun("tacz:rpk", 40, "AUTO"), "762x39", "tacz:rpk"),
+                new GunData(createTaczGun("tacz:fn_evolys", 30, "AUTO"), "556x45", "tacz:fn_evolys"),
+                new GunData(createTaczGun("tacz:m249", 64, "AUTO"), "556x45", "tacz:m249"));
+        GunData selected = guns.get(random.nextInt(guns.size()));
+        addTierLore(selected.itemStack, "EPIC", "§d");
+        return selected;
     }
-    
+
     /**
      * Legendary 총기
      */
     private GunData getRandomLegendaryGun() {
         List<GunData> guns = Arrays.asList(
-            new GunData(createTaczGun("tacz:m107", 10, "SEMI"), "50bmg"),
-            new GunData(createTaczGun("tacz:m95", 5, "SEMI"), "50bmg"),
-            new GunData(createTaczGunWithHeat("tacz:minigun", 9999, "AUTO", 46.0f), "762x39"),
-            new GunData(createTaczGun("tacz:rpg7", 1, "SEMI"), "rpg_rocket")
-        );
-        return guns.get(random.nextInt(guns.size()));
+                new GunData(createTaczGun("tacz:m107", 10, "SEMI"), "50bmg", "tacz:m107"),
+                new GunData(createTaczGun("tacz:m95", 5, "SEMI"), "50bmg", "tacz:m95"),
+                new GunData(createTaczGunWithHeat("tacz:minigun", 9999, "AUTO", 46.0f), "308", "tacz:minigun"),
+                new GunData(createTaczGun("tacz:rpg7", 1, "SEMI"), "rpg_rocket", "tacz:rpg7"));
+        GunData selected = guns.get(random.nextInt(guns.size()));
+        addTierLore(selected.itemStack, "LEGENDARY", "§6");
+        return selected;
     }
-    
+
     /**
      * TACZ 총기 아이템 생성
      */
     private ItemStack createTaczGun(String gunId, int ammo, String fireMode) {
         return com.battleroyale.util.TaczItemUtil.createGun(gunId, ammo, fireMode);
     }
-    
+
     /**
      * Heat가 있는 TACZ 총기 (미니건용)
      */
     private ItemStack createTaczGunWithHeat(String gunId, int ammo, String fireMode, float heat) {
         return com.battleroyale.util.TaczItemUtil.createGun(gunId, ammo, fireMode, heat);
     }
-    
+
     /**
      * 랜덤 부착물
      */
     private ItemStack getRandomAttachment() {
         List<String> attachments = Arrays.asList(
-            "tacz:sight_sro_dot", "tacz:sight_srs_02", "tacz:sight_pk06_rifle", "tacz:sight_t2",
-            "tacz:sight_552", "tacz:scope_hamr", "tacz:scope_lpvo_1_6", "tacz:scope_mk5hd",
-            "tacz:muzzle_silencer_knight_qd", "tacz:muzzle_silencer_ursus", "tacz:muzzle_silencer_vulture",
-            "tacz:muzzle_brake_cyclone_d2", "tacz:muzzle_brake_pioneer", "tacz:muzzle_brake_timeless50",
-            "tacz:grip_se_5", "tacz:grip_osovets_black", "tacz:grip_td", "tacz:grip_vertical_military",
-            "tacz:extended_mag_2", "tacz:extended_mag_3", "tacz:light_extended_mag_2",
-            "tacz:laser_compact", "tacz:laser_lopro"
-        );
-        
+                "tacz:sight_sro_dot", "tacz:sight_srs_02", "tacz:sight_pk06_rifle", "tacz:sight_t2",
+                "tacz:sight_552", "tacz:scope_hamr", "tacz:scope_lpvo_1_6", "tacz:scope_mk5hd",
+                "tacz:muzzle_silencer_knight_qd", "tacz:muzzle_silencer_ursus", "tacz:muzzle_silencer_vulture",
+                "tacz:muzzle_brake_cyclone_d2", "tacz:muzzle_brake_pioneer", "tacz:muzzle_brake_timeless50",
+                "tacz:grip_se_5", "tacz:grip_osovets_black", "tacz:grip_td", "tacz:grip_vertical_military",
+                "tacz:extended_mag_2", "tacz:extended_mag_3", "tacz:light_extended_mag_2",
+                "tacz:laser_compact", "tacz:laser_lopro");
+
         String attachmentId = attachments.get(random.nextInt(attachments.size()));
         return com.battleroyale.util.TaczItemUtil.createAttachment(attachmentId);
     }
-    
+
     /**
      * 랜덤 음식
      */
     private ItemStack getRandomFood() {
         List<Material> foods = Arrays.asList(
-            Material.COOKED_BEEF,
-            Material.COOKED_PORKCHOP,
-            Material.COOKED_CHICKEN,
-            Material.GOLDEN_CARROT,
-            Material.GOLDEN_APPLE
-        );
-        
+                Material.COOKED_BEEF,
+                Material.COOKED_PORKCHOP,
+                Material.COOKED_CHICKEN,
+                Material.GOLDEN_CARROT,
+                Material.GOLDEN_APPLE);
+
         Material food = foods.get(random.nextInt(foods.size()));
         int amount = food == Material.GOLDEN_APPLE ? 1 : random.nextInt(4) + 1;
         return new ItemStack(food, amount);
     }
-    
+
     /**
      * 랜덤 장비
      */
     private ItemStack getRandomEquipment() {
         boolean isDiamond = random.nextDouble() < 0.2; // 20% 확률로 다이아
-        
+
         List<Material> ironEquipment = Arrays.asList(
-            Material.IRON_HELMET, Material.IRON_CHESTPLATE, Material.IRON_LEGGINGS,
-            Material.IRON_BOOTS, Material.IRON_SWORD, Material.IRON_PICKAXE
-        );
-        
+                Material.IRON_HELMET, Material.IRON_CHESTPLATE, Material.IRON_LEGGINGS,
+                Material.IRON_BOOTS, Material.IRON_SWORD, Material.IRON_PICKAXE);
+
         List<Material> diamondEquipment = Arrays.asList(
-            Material.DIAMOND_HELMET, Material.DIAMOND_CHESTPLATE, Material.DIAMOND_LEGGINGS,
-            Material.DIAMOND_BOOTS, Material.DIAMOND_SWORD, Material.DIAMOND_PICKAXE
-        );
-        
+                Material.DIAMOND_HELMET, Material.DIAMOND_CHESTPLATE, Material.DIAMOND_LEGGINGS,
+                Material.DIAMOND_BOOTS, Material.DIAMOND_SWORD, Material.DIAMOND_PICKAXE);
+
         List<Material> equipment = isDiamond ? diamondEquipment : ironEquipment;
         return new ItemStack(equipment.get(random.nextInt(equipment.size())));
     }
-    
+
     /**
      * 랜덤 탄약
      */
@@ -306,7 +320,8 @@ public class SupplyLootGenerator {
         ammoIdMap.put("762x39", "tacz:762x39");
         ammoIdMap.put("12g", "tacz:12g");
         ammoIdMap.put("rpg_rocket", "tacz:rpg_rocket");
-        
+        ammoIdMap.put("308", "tacz:308");
+
         Map<String, Integer> ammoMaxCounts = new HashMap<>();
         ammoMaxCounts.put("50ae", 48);
         ammoMaxCounts.put("9mm", 60);
@@ -319,7 +334,8 @@ public class SupplyLootGenerator {
         ammoMaxCounts.put("762x39", 60);
         ammoMaxCounts.put("12g", 36);
         ammoMaxCounts.put("rpg_rocket", 6);
-        
+        ammoMaxCounts.put("308", 48);
+
         String ammoType;
         if (preferredAmmo != null && ammoMaxCounts.containsKey(preferredAmmo)) {
             ammoType = preferredAmmo;
@@ -327,25 +343,44 @@ public class SupplyLootGenerator {
             List<String> ammoTypes = new ArrayList<>(ammoMaxCounts.keySet());
             ammoType = ammoTypes.get(random.nextInt(ammoTypes.size()));
         }
-        
+
         int maxCount = ammoMaxCounts.get(ammoType);
         boolean fullSet = random.nextBoolean(); // 50% 1세트, 50% 반세트
         int amount = fullSet ? maxCount : maxCount / 2;
-        
+
         String ammoId = ammoIdMap.get(ammoType);
         return com.battleroyale.util.TaczItemUtil.createAmmo(ammoId, amount);
     }
-    
+
+    private void addTierLore(ItemStack item, String tierName, String colorCode) {
+        if (item == null)
+            return;
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
+            lore.add(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+                    .deserialize("§7---"));
+            lore.add(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+                    .deserialize("§7Grade: " + colorCode + "§l" + tierName));
+            lore.add(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+                    .deserialize("§7---"));
+            meta.lore(lore);
+            item.setItemMeta(meta);
+        }
+    }
+
     /**
      * 총기 데이터 클래스
      */
     private static class GunData {
         ItemStack itemStack;
         String ammoType;
-        
-        GunData(ItemStack itemStack, String ammoType) {
+        String gunId;
+
+        GunData(ItemStack itemStack, String ammoType, String gunId) {
             this.itemStack = itemStack;
             this.ammoType = ammoType;
+            this.gunId = gunId;
         }
     }
 }

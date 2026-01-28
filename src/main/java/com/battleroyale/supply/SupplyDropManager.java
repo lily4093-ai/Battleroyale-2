@@ -26,16 +26,13 @@ public class SupplyDropManager {
     private BossBar supplyBossBar;
     private BukkitTask supplyTask;
     private BukkitTask compassTask;
-    private int totalDropsThisRound;
-    private int completedDropsThisRound;
-    private int currentRoundNumber;
+    private int totalDrops;
 
     // 보급품 위치 추적
     private final Set<Location> supplyCrateLocations = new HashSet<>();
     private final Set<Location> openedSupplyCrates = new HashSet<>();
 
-    private static final int DROPS_PER_ROUND = 100; // 1회당 100개
-    private static final int DROP_INTERVAL = 60; // 3초 (60틱) - 3초마다 2개
+    private static final int DROP_INTERVAL = 40; // 2초 (40틱)
 
     public SupplyDropManager(BattleRoyalePlugin plugin) {
         this.plugin = plugin;
@@ -43,43 +40,28 @@ public class SupplyDropManager {
     }
 
     /**
-     * 보급품 투하 시작
-     * 
-     * @param roundNumber 투하 회차 (1, 2, 3)
+     * 보급품 상시 투하 시작
+     * 2초마다 1개씩 게임 종료 시까지 투하됩니다.
      */
-    public void startSupplyDrop(int roundNumber) {
+    public void startContinuousSupplyDrop() {
         if (supplyTask != null && !supplyTask.isCancelled()) {
             return; // 이미 진행 중
         }
 
-        totalDropsThisRound = 0;
-        completedDropsThisRound = 0;
-        currentRoundNumber = roundNumber;
+        totalDrops = 0;
 
-        broadcast("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 시작됩니다!");
-        broadcast("§73초마다 2개의 보급 상자가 투하됩니다.");
+        broadcast("§e§l[배틀로얄 2.0] §a보급품 투하 시스템이 가동되었습니다!");
+        broadcast("§7게임 내내 2초마다 1개의 보급 상자가 무작위 위치에 투하됩니다.");
 
         createSupplyBossBar();
 
-        // 즉시 투하 루프 시작 (3초마다 2개)
+        // 2초마다 1개씩 투하 (무한 루프)
         supplyTask = new BukkitRunnable() {
             @Override
             public void run() {
-                if (totalDropsThisRound >= DROPS_PER_ROUND) {
-                    cancel();
-                    return;
-                }
-
-                // 3초마다 2개씩 투하
                 processSupplyDrop();
-                totalDropsThisRound++;
-
-                if (totalDropsThisRound < DROPS_PER_ROUND) {
-                    processSupplyDrop();
-                    totalDropsThisRound++;
-                }
             }
-        }.runTaskTimer(plugin, 0L, DROP_INTERVAL);
+        }.runTaskTimer(plugin, 40L, DROP_INTERVAL);
     }
 
     /**
@@ -87,12 +69,17 @@ public class SupplyDropManager {
      */
     private void processSupplyDrop() {
         World world = Bukkit.getWorlds().get(0);
+        if (world == null)
+            return;
+
         WorldBorder border = world.getWorldBorder();
         Random random = new Random();
         double size = border.getSize() / 2;
+        Location center = border.getCenter();
 
-        double x = (random.nextDouble() * size * 2) - size;
-        double z = (random.nextDouble() * size * 2) - size;
+        // 자기장 내의 무작위 좌표 (중심점 기준)
+        double x = center.getX() + (random.nextDouble() * size * 2) - size;
+        double z = center.getZ() + (random.nextDouble() * size * 2) - size;
 
         // 청크 로드 확인 및 처리
         int chunkX = (int) x >> 4;
@@ -106,13 +93,8 @@ public class SupplyDropManager {
         Location loc = findGroundLocationAt(world, x, z);
         if (loc != null) {
             dropSupplyCrateAt(loc);
-            completedDropsThisRound++;
+            totalDrops++;
             updateSupplyBossBar();
-
-            // 모든 투하가 완료되었는지 체크
-            if (completedDropsThisRound >= DROPS_PER_ROUND) {
-                finishSupplyDrop(currentRoundNumber);
-            }
         }
     }
 
@@ -135,7 +117,7 @@ public class SupplyDropManager {
     /**
      * 지정된 위치에 보급 상자 투하
      */
-    private void dropSupplyCrateAt(Location dropLocation) {
+    public void dropSupplyCrateAt(Location dropLocation) {
         // 상자 생성
         dropLocation.getBlock().setType(Material.CHEST);
         org.bukkit.block.Chest chest = (org.bukkit.block.Chest) dropLocation.getBlock().getState();
@@ -158,15 +140,15 @@ public class SupplyDropManager {
         }
 
         supplyBossBar = Bukkit.createBossBar(
-                "§a§l보급품 투하 진행 중...",
+                "§a§l보급품 투하 활성화",
                 BarColor.GREEN,
-                BarStyle.SEGMENTED_10);
+                BarStyle.SOLID);
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             supplyBossBar.addPlayer(player);
         }
 
-        supplyBossBar.setProgress(0.0);
+        supplyBossBar.setProgress(1.0);
         supplyBossBar.setVisible(true);
     }
 
@@ -177,16 +159,18 @@ public class SupplyDropManager {
         if (supplyBossBar == null)
             return;
 
-        double progress = (double) completedDropsThisRound / DROPS_PER_ROUND;
-        supplyBossBar.setProgress(Math.min(1.0, progress));
-        supplyBossBar.setTitle("§a§l보급품 투하 §f| §e" + completedDropsThisRound + "§f개 투하 완료됨");
+        supplyBossBar.setTitle("§a§l보급품 투하 §f| §e누적 " + totalDrops + "개 투하됨");
     }
 
     /**
      * 보급품 투하 완료
+     * (현재 상시 투하 방식으로 변경되어 사용되지 않음)
      */
-    private void finishSupplyDrop(int roundNumber) {
-        broadcast("§e§l[배틀로얄 2.0] §a제" + roundNumber + "차 보급품 투하가 완료되었습니다!");
+    public void stopSupplyDrop() {
+        if (supplyTask != null) {
+            supplyTask.cancel();
+            supplyTask = null;
+        }
 
         if (supplyBossBar != null) {
             supplyBossBar.setVisible(false);
@@ -378,6 +362,6 @@ public class SupplyDropManager {
     }
 
     private void broadcast(String message) {
-        Bukkit.broadcast(LegacyComponentSerializer.legacySection().deserialize(message));
+        Bukkit.broadcastMessage(message);
     }
 }

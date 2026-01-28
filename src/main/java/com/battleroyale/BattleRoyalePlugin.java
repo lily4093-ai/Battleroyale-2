@@ -26,7 +26,9 @@ public class BattleRoyalePlugin extends JavaPlugin {
         supplyDropManager = new SupplyDropManager(this);
 
         // Register commands
-        getCommand("br").setExecutor(new BRCommand(this));
+        BRCommand brCommand = new BRCommand(this);
+        getCommand("br").setExecutor(brCommand);
+        getCommand("br").setTabCompleter(brCommand);
 
         // Register listeners
         registerListeners();
@@ -57,7 +59,6 @@ public class BattleRoyalePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
         getServer().getPluginManager().registerEvents(new SupplyDropListener(this), this);
         getServer().getPluginManager().registerEvents(new BlockRestrictionListener(this), this);
-        getServer().getPluginManager().registerEvents(new MobSpawnListener(), this);
     }
 
     public static BattleRoyalePlugin getInstance() {

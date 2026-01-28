@@ -14,7 +14,7 @@ world-generators:
 commands:
   br:
     description: Battle Royale main command
-    usage: /br <start|stop|info> [team_size]
+    usage: "/br <start|stop|info|reload|testloot> [args]"
     permission: battleroyale.admin
     aliases: [battleroyale]
 

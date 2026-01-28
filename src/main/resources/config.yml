@@ -100,35 +100,35 @@ supply-drop:
   # 투하 간격 (초 단위, 1 = 1초에 1개)
   drop-interval: 1
   
-  # 총기 드롭 확률 (0.35 = 35%)
-  gun-chance: 0.45
+  # 총기 드롭 확률 (0.8 = 80%)
+  gun-chance: 0.8
   
   # 부착물 드롭 확률 (슬롯당)
-  attachment-chance: 0.08
+  attachment-chance: 0.12
   attachment-max: 2
   
   # 음식 드롭 확률 (슬롯당)
-  food-chance: 0.15
+  food-chance: 0.2
   food-max: 3
   
   # 장비 드롭 확률 (슬롯당)
-  equipment-chance: 0.10
+  equipment-chance: 0.15
   equipment-max: 2
   
   # 조약돌 드롭 확률
-  cobblestone-chance: 0.25
+  cobblestone-chance: 0.3
   cobblestone-amount: 16
   
   # 탄약 드롭 확률 (빈 칸당)
-  ammo-chance: 0.09
+  ammo-chance: 0.2
 
-# 총기 티어별 가중치
+# 총기 티어별 가중치 (전체 합 100 기준)
 gun-tiers:
-  common: 35
-  uncommon: 35
-  rare: 20
-  epic: 7
-  legendary: 3
+  common: 15
+  uncommon: 45
+  rare: 25
+  epic: 10
+  legendary: 5
 
 # 팀 시스템
 teams:
